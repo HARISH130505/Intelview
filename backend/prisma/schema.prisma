@@ -1,0 +1,476 @@
+// Intelview - Prisma Schema
+// Database: Neon PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+  VERY_HARD
+}
+
+enum QuestionType {
+  CODING
+  BEHAVIORAL
+  SYSTEM_DESIGN
+  CORE_CS
+  APTITUDE
+  HR
+  MIXED
+}
+
+enum InterviewType {
+  ONLINE_ASSESSMENT
+  PHONE_SCREEN
+  TECHNICAL
+  BEHAVIORAL
+  SYSTEM_DESIGN
+  MANAGERIAL
+  HR
+  ONSITE
+}
+
+enum ReportStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSING
+}
+
+enum OfferStatus {
+  ACCEPTED
+  REJECTED
+  PENDING
+  WITHDRAWN
+  NO_OFFER
+  UNKNOWN
+}
+
+enum MockStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum BookmarkType {
+  QUESTION
+  COMPANY
+  REPORT
+  ROADMAP
+  MOCK_SESSION
+}
+
+enum CompanyTier {
+  FAANG
+  TIER1
+  TIER2
+  STARTUP
+  MNC
+  PRODUCT
+  SERVICE
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+model User {
+  id          String   @id @default(cuid())
+  clerkId     String   @unique
+  email       String   @unique
+  name        String
+  avatarUrl   String?
+  bio         String?
+  role        Role     @default(USER)
+  college     String?
+  graduationYear Int?
+  targetRoles String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  reports       InterviewReport[]
+  bookmarks     Bookmark[]
+  studyPlans    StudyPlan[]
+  mockSessions  MockSession[]
+  resumeUploads ResumeUpload[]
+  searchHistory SearchHistory[]
+  analytics     UserAnalytics[]
+
+  @@map("users")
+}
+
+// ============================================================
+// COMPANIES
+// ============================================================
+
+model Company {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  slug        String      @unique
+  logo        String?
+  description String?
+  website     String?
+  industry    String?
+  size        String?     // "1-50", "51-200", "201-500", "500+"
+  tier        CompanyTier @default(TIER2)
+  headquarter String?
+  founded     Int?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  reports         InterviewReport[]
+  companyQuestions CompanyQuestion[]
+  mockSessions    MockSession[]
+  studyPlans      StudyPlan[]
+  analytics       CompanyAnalytics[]
+  bookmarks       Bookmark[]
+
+  @@map("companies")
+}
+
+// ============================================================
+// INTERVIEW REPORTS
+// ============================================================
+
+model InterviewReport {
+  id            String       @id @default(cuid())
+  companyId     String
+  userId        String?
+  role          String
+  location      String?
+  interviewDate DateTime?
+  difficulty    Difficulty   @default(MEDIUM)
+  offerStatus   OfferStatus  @default(UNKNOWN)
+  status        ReportStatus @default(PENDING)
+  source        String       @default("community") // "community", "reddit", "gfg"
+  sourceUrl     String?
+  rawText       String       @db.Text
+  experience    String?      @db.Text
+  yearsExp      Int?
+  salary        String?
+  isAnonymous   Boolean      @default(false)
+  processedAt   DateTime?
+  viewCount     Int          @default(0)
+  helpfulCount  Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  company   Company @relation(fields: [companyId], references: [id])
+  user      User?   @relation(fields: [userId], references: [id])
+  rounds    Round[]
+  questions ReportQuestion[]
+
+  @@map("interview_reports")
+}
+
+model Round {
+  id          String        @id @default(cuid())
+  reportId    String
+  roundNumber Int
+  type        InterviewType @default(TECHNICAL)
+  description String?       @db.Text
+  duration    Int?          // minutes
+  difficulty  Difficulty?
+  outcome     String?
+  createdAt   DateTime      @default(now())
+
+  report    InterviewReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  questions ReportQuestion[]
+
+  @@map("rounds")
+}
+
+// ============================================================
+// QUESTIONS
+// ============================================================
+
+model Question {
+  id            String       @id @default(cuid())
+  text          String       @db.Text
+  difficulty    Difficulty   @default(MEDIUM)
+  type          QuestionType @default(CODING)
+  frequency     Int          @default(1)
+  source        String?
+  hints         String[]
+  sampleAnswer  String?      @db.Text
+  constraints   String?
+  isVerified    Boolean      @default(false)
+  viewCount     Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  topics          QuestionTopic[]
+  companyQuestions CompanyQuestion[]
+  reportQuestions  ReportQuestion[]
+  mockQuestions    MockQuestion[]
+  bookmarks        Bookmark[]
+
+  @@map("questions")
+}
+
+model Topic {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  category    String   // "DSA", "System Design", "Behavioral", "Core CS", etc.
+  color       String?  // hex color for UI
+  iconName    String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  questionTopics QuestionTopic[]
+
+  @@map("topics")
+}
+
+model QuestionTopic {
+  questionId String
+  topicId    String
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  topic    Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, topicId])
+  @@map("question_topics")
+}
+
+model CompanyQuestion {
+  id          String    @id @default(cuid())
+  companyId   String
+  questionId  String
+  frequency   Int       @default(1)
+  lastSeen    DateTime?
+  isRecent    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  question Question @relation(fields: [questionId], references: [id])
+
+  @@unique([companyId, questionId])
+  @@map("company_questions")
+}
+
+model ReportQuestion {
+  id         String   @id @default(cuid())
+  reportId   String
+  questionId String?
+  roundId    String?
+  rawText    String   @db.Text // original text from report
+  createdAt  DateTime @default(now())
+
+  report   InterviewReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  question Question?       @relation(fields: [questionId], references: [id])
+  round    Round?          @relation(fields: [roundId], references: [id])
+
+  @@map("report_questions")
+}
+
+// ============================================================
+// RESUME
+// ============================================================
+
+model ResumeUpload {
+  id         String   @id @default(cuid())
+  userId     String
+  fileUrl    String
+  fileName   String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id])
+  analyses ResumeAnalysis[]
+
+  @@map("resume_uploads")
+}
+
+model ResumeAnalysis {
+  id              String   @id @default(cuid())
+  resumeId        String
+  jdText          String?  @db.Text
+  jdTitle         String?
+  jdCompany       String?
+  atsScore        Int      @default(0)
+  matchedSkills   String[]
+  missingSkills   String[]
+  matchedKeywords String[]
+  suggestions     Json     @default("[]") // Array of suggestion objects
+  skillsBreakdown Json     @default("{}") // Detailed breakdown
+  createdAt       DateTime @default(now())
+
+  resume ResumeUpload @relation(fields: [resumeId], references: [id])
+
+  @@map("resume_analyses")
+}
+
+// ============================================================
+// MOCK INTERVIEW
+// ============================================================
+
+model MockSession {
+  id            String     @id @default(cuid())
+  userId        String
+  companyId     String?
+  role          String
+  type          QuestionType @default(CODING)
+  difficulty    Difficulty   @default(MEDIUM)
+  status        MockStatus   @default(IN_PROGRESS)
+  totalScore    Int?
+  timeLimit     Int          @default(60) // minutes
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  feedback      Json?        // AI generated overall feedback
+  createdAt     DateTime     @default(now())
+
+  user      User         @relation(fields: [userId], references: [id])
+  company   Company?     @relation(fields: [companyId], references: [id])
+  questions MockQuestion[]
+  bookmarks Bookmark[]
+
+  @@map("mock_sessions")
+}
+
+model MockQuestion {
+  id               String     @id @default(cuid())
+  sessionId        String
+  questionId       String?
+  questionText     String     @db.Text
+  questionType     QuestionType @default(CODING)
+  userAnswer       String?    @db.Text
+  aiEvaluation     Json?      // Detailed evaluation
+  score            Int?       // 0-100
+  timeTaken        Int?       // seconds
+  createdAt        DateTime   @default(now())
+
+  session  MockSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question Question?   @relation(fields: [questionId], references: [id])
+
+  @@map("mock_questions")
+}
+
+// ============================================================
+// STUDY PLANNER
+// ============================================================
+
+model StudyPlan {
+  id            String    @id @default(cuid())
+  userId        String
+  companyId     String?
+  title         String
+  role          String
+  experienceLevel String  @default("fresher") // fresher, junior, mid, senior
+  targetDate    DateTime?
+  availableDays Int       @default(30)
+  dailyHours    Float     @default(3)
+  generatedPlan Json      // Array of days with topics and tasks
+  isActive      Boolean   @default(true)
+  progress      Int       @default(0) // 0-100
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
+  company  Company? @relation(fields: [companyId], references: [id])
+  bookmarks Bookmark[]
+
+  @@map("study_plans")
+}
+
+// ============================================================
+// BOOKMARKS
+// ============================================================
+
+model Bookmark {
+  id           String       @id @default(cuid())
+  userId       String
+  type         BookmarkType
+  questionId   String?
+  companyId    String?
+  reportId     String?
+  studyPlanId  String?
+  mockSessionId String?
+  notes        String?
+  createdAt    DateTime     @default(now())
+
+  user        User             @relation(fields: [userId], references: [id])
+  question    Question?        @relation(fields: [questionId], references: [id])
+  company     Company?         @relation(fields: [companyId], references: [id])
+  studyPlan   StudyPlan?       @relation(fields: [studyPlanId], references: [id])
+  mockSession MockSession?     @relation(fields: [mockSessionId], references: [id])
+
+  @@map("bookmarks")
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+
+model CompanyAnalytics {
+  id            String   @id @default(cuid())
+  companyId     String
+  metric        String   // "interview_count", "avg_difficulty", "hire_rate", etc.
+  value         Float
+  period        String   // "2024-01", "2024-Q1", "2024", "all_time"
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, metric, period])
+  @@map("company_analytics")
+}
+
+model UserAnalytics {
+  id        String   @id @default(cuid())
+  userId    String
+  metric    String
+  value     Float
+  period    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_analytics")
+}
+
+// ============================================================
+// SEARCH HISTORY
+// ============================================================
+
+model SearchHistory {
+  id          String   @id @default(cuid())
+  userId      String?
+  query       String
+  filters     Json?
+  resultCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("search_history")
+}
