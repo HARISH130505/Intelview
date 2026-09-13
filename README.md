@@ -1,4 +1,4 @@
-# 🚀 Intelview — AI-Powered Interview Intelligence Platform
+# IntelView — AI-Powered Interview Intelligence Platform
 
 <p align="center">
   <img src="https://img.shields.io/badge/Next.js-16.2-black?style=for-the-badge&logo=next.js" alt="Next.js" />
@@ -226,9 +226,3 @@ cd Intelview
 | `POST` | `/api/planner/generate` | Generate personalized preparation roadmap | Required |
 | `PATCH`| `/api/planner/:id/progress` | Update checklist progress on study plan | Required |
 | `GET` | `/api/analytics/overview` | Global platform metrics & trend charts | Public |
-
----
-
-## 🛡️ License
-
-This project is licensed under the **MIT License**. Feel free to use, modify, and distribute it for educational or commercial purposes.
