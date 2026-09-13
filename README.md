@@ -179,36 +179,14 @@ cd Intelview
    npm install
    ```
 
-2. **Configure Environment Variables (`backend/.env`):**
-   ```env
-   PORT=5000
-   NODE_ENV=development
-   FRONTEND_URL=http://localhost:3000
-
-   # Database (Neon PostgreSQL)
-   DATABASE_URL="postgresql://<user>:<password>@<neon-host>/neondb?sslmode=require"
-
-   # Clerk Authentication
-   CLERK_SECRET_KEY="sk_test_..."
-   CLERK_PUBLISHABLE_KEY="pk_test_..."
-
-   # Google Gemini AI
-   GEMINI_API_KEY="AIzaSy..."
-
-   # Cloudinary (Optional, for resume cloud storage)
-   CLOUDINARY_CLOUD_NAME="your-cloud-name"
-   CLOUDINARY_API_KEY="your-api-key"
-   CLOUDINARY_API_SECRET="your-api-secret"
-   ```
-
-3. **Initialize Database & Seed Data:**
+2. **Initialize Database & Seed Data:**
    ```bash
    npx prisma generate
    npx prisma db push
    npm run prisma:seed
    ```
 
-4. **Start the Backend Dev Server:**
+3. **Start the Backend Dev Server:**
    ```bash
    npm run dev
    ```
@@ -224,18 +202,7 @@ cd Intelview
    npm install
    ```
 
-2. **Configure Environment Variables (`frontend/.env.local`):**
-   ```env
-   NEXT_PUBLIC_API_URL=http://localhost:5000/api
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-   CLERK_SECRET_KEY=sk_test_...
-   NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-   NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-   NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-   NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
-   ```
-
-3. **Start Next.js Development Server:**
+2. **Start Next.js Development Server:**
    ```bash
    npm run dev
    ```
