@@ -140,14 +140,48 @@ model Company {
   updatedAt   DateTime    @updatedAt
 
   // Relations
-  reports         InterviewReport[]
+  reports          InterviewReport[]
   companyQuestions CompanyQuestion[]
-  mockSessions    MockSession[]
-  studyPlans      StudyPlan[]
-  analytics       CompanyAnalytics[]
-  bookmarks       Bookmark[]
+  researches       CompanyResearch[]
+  mockSessions     MockSession[]
+  studyPlans       StudyPlan[]
+  analytics        CompanyAnalytics[]
+  bookmarks        Bookmark[]
 
   @@map("companies")
+}
+
+// ============================================================
+// COMPANY RESEARCH & INTELLIGENCE
+// ============================================================
+
+model CompanyResearch {
+  id           String   @id @default(cuid())
+
+  companyId    String
+  role         String
+
+  // AI-generated structured research (OA format, rounds, recent questions, insights, salary)
+  researchData Json
+
+  // Grounded/public source URLs returned by Gemini Search Grounding
+  sources      Json     @default("[]")
+
+  // Cache management
+  researchedAt DateTime @default(now())
+  expiresAt    DateTime
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, role])
+  @@index([companyId])
+  @@index([expiresAt])
+
+  @@map("company_research")
 }
 
 // ============================================================

@@ -4,7 +4,6 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowRight,
-  Zap,
   Brain,
   TrendingUp,
   Target,
@@ -18,17 +17,14 @@ import {
   Users,
   BarChart3,
   CheckCircle,
-  Sparkles,
   Map,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
+import { analyticsAPI } from "@/lib/api";
 
-// ============================================================
-// MOCK DATA for landing page (not dependent on backend)
-// ============================================================
 const STATS = [
   { label: "Companies Tracked", value: 500, suffix: "+", icon: Building2, color: "text-brand-400" },
   { label: "Interview Reports", value: 12000, suffix: "+", icon: FileSearch, color: "text-emerald-400" },
@@ -153,9 +149,6 @@ const FAQ_ITEMS = [
   },
 ];
 
-// ============================================================
-// COUNT-UP HOOK
-// ============================================================
 function useCountUp(end: number, duration = 2000, start = 0) {
   const [count, setCount] = useState(start);
   const [hasStarted, setHasStarted] = useState(false);
@@ -186,7 +179,7 @@ function useCountUp(end: number, duration = 2000, start = 0) {
 }
 
 function StatCard({ label, value, suffix, icon: Icon, color }: typeof STATS[0]) {
-  const { count, ref } = useCountUp(value, 2000);
+  const { count, ref } = useCountUp(value, 800);
   return (
     <div ref={ref} className="glass-card p-6 text-center">
       <Icon className={cn("w-8 h-8 mx-auto mb-3", color)} />
@@ -198,9 +191,6 @@ function StatCard({ label, value, suffix, icon: Icon, color }: typeof STATS[0]) 
   );
 }
 
-// ============================================================
-// LANDING PAGE
-// ============================================================
 export default function LandingPage() {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -208,19 +198,83 @@ export default function LandingPage() {
   const heroY = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
+  const [liveStats, setLiveStats] = useState({
+    companies: 27,
+    reports: 0,
+    questions: 59,
+    members: 1,
+  });
+  const [trendingCompanies, setTrendingCompanies] = useState<any[]>([]);
+  const [trendingQuestions, setTrendingQuestions] = useState<any[]>([]);
+  const [loadingTrending, setLoadingTrending] = useState(true);
+
+  useEffect(() => {
+    async function loadLandingData() {
+      try {
+        const [overview, trending] = await Promise.all([
+          analyticsAPI.getOverview().catch(() => null),
+          analyticsAPI.getTrending().catch(() => null),
+        ]);
+
+        if (overview?.stats) {
+          setLiveStats({
+            companies: overview.stats.totalCompanies,
+            reports: overview.stats.totalReports,
+            questions: overview.stats.totalQuestions,
+            members: overview.stats.totalUsers,
+          });
+        }
+
+        if (trending?.data?.topCompanies?.length > 0) {
+          setTrendingCompanies(
+            trending.data.topCompanies.map((c: any) => ({
+              name: c.name,
+              slug: c.slug,
+              tier: c.tier,
+              reports: c._count?.reports || 0,
+              logo: c.name.charAt(0),
+              color: c.tier === "FAANG" ? "from-amber-500 to-yellow-600" : "from-brand-500 to-blue-600",
+            }))
+          );
+        } else {
+          setTrendingCompanies(TRENDING_COMPANIES);
+        }
+
+        if (trending?.data?.topQuestions?.length > 0) {
+          setTrendingQuestions(
+            trending.data.topQuestions.map((q: any) => ({
+              text: q.text,
+              type: q.type,
+              difficulty: q.difficulty,
+              companies: q.companyQuestions?.length || 1,
+            }))
+          );
+        } else {
+          setTrendingQuestions(TRENDING_QUESTIONS);
+        }
+      } catch {
+        setTrendingCompanies(TRENDING_COMPANIES);
+        setTrendingQuestions(TRENDING_QUESTIONS);
+      } finally {
+        setLoadingTrending(false);
+      }
+    }
+    loadLandingData();
+  }, []);
+
+  const statsData = [
+    { label: "Companies Tracked", value: liveStats.companies, suffix: "+", icon: Building2, color: "text-brand-400" },
+    { label: "Questions Indexed", value: liveStats.questions, suffix: "+", icon: Code2, color: "text-violet-400" },
+    { label: "Interview Reports", value: liveStats.reports, suffix: "", icon: FileSearch, color: "text-emerald-400" },
+    { label: "Community Members", value: Math.max(liveStats.members, 1), suffix: "+", icon: Users, color: "text-amber-400" },
+  ];
+
   return (
     <div className="min-h-screen bg-dark-950">
       <Navbar />
-
-      {/* ============================================================ */}
-      {/* HERO SECTION */}
-      {/* ============================================================ */}
       <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-        {/* Background */}
         <div className="absolute inset-0 bg-grid opacity-50" />
         <div className="absolute inset-0 bg-hero-glow" />
-
-        {/* Floating orbs */}
         <motion.div
           animate={{ y: [0, -20, 0], scale: [1, 1.05, 1] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
@@ -231,77 +285,56 @@ export default function LandingPage() {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
           className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-violet-500/5 blur-3xl"
         />
-
         <motion.div
           style={{ y: heroY, opacity: heroOpacity }}
           className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center"
         >
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm font-medium mb-8"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Powered by Google Gemini AI
-          </motion.div>
-
-          {/* Heading */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-5xl sm:text-6xl md:text-7xl font-black font-display tracking-tight text-white leading-[1.08] mb-6"
+            className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black font-display tracking-tight text-white leading-[1.15] sm:leading-[1.08] mb-4 sm:mb-6"
           >
             Interview Intelligence,{" "}
             <span className="gradient-text">Powered by AI</span>
           </motion.h1>
-
-          {/* Subheading */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed"
+            className="text-sm sm:text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed px-1 sm:px-0"
           >
             Transform scattered interview experiences into{" "}
             <span className="text-white font-medium">structured, AI-powered intelligence</span>.
             Real company data. Real questions. Real insights. Personalized for you.
           </motion.p>
-
-          {/* CTAs */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center max-w-xs sm:max-w-none mx-auto"
           >
-            <Link href="/sign-up" className="btn-brand text-base py-4 px-8">
+            <Link href="/sign-up" className="btn-brand text-sm sm:text-base py-3.5 sm:py-4 px-6 sm:px-8 w-full sm:w-auto">
               Start Preparing Free
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link href="/explore" className="btn-ghost text-base py-4 px-8">
+            <Link href="/companies" className="btn-ghost text-sm sm:text-base py-3.5 sm:py-4 px-6 sm:px-8 w-full sm:w-auto">
               <Building2 className="w-4 h-4" />
               Explore Companies
             </Link>
           </motion.div>
-
-          {/* Trust indicators */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
-            className="flex flex-wrap items-center justify-center gap-6 mt-12 text-slate-500 text-sm"
+            className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-8 sm:mt-12 text-slate-500 text-xs sm:text-sm"
           >
             {["Google", "Amazon", "Microsoft", "Meta", "Flipkart"].map((co) => (
               <span key={co} className="font-medium text-slate-400">{co}</span>
             ))}
-            <span className="text-slate-600">+ 495 more</span>
+            <span className="text-slate-600">+ {Math.max(liveStats.companies - 5, 0)} more</span>
           </motion.div>
         </motion.div>
-
-        {/* Scroll indicator */}
         <motion.div
           animate={{ y: [0, 8, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
@@ -311,9 +344,7 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ============================================================ */}
-      {/* STATS SECTION */}
-      {/* ============================================================ */}
+      {/* Stats Row — Live from DB */}
       <section className="py-20 relative">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -323,7 +354,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
             className="grid grid-cols-2 md:grid-cols-4 gap-4"
           >
-            {STATS.map((stat, i) => (
+            {statsData.map((stat, i) => (
               <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
@@ -337,10 +368,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
-
-      {/* ============================================================ */}
-      {/* FEATURES SECTION */}
-      {/* ============================================================ */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -349,10 +376,6 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium mb-4">
-              <Zap className="w-3 h-3" />
-              Everything You Need
-            </div>
             <h2 className="section-heading">
               The Bloomberg of Interview Intelligence
             </h2>
@@ -373,7 +396,6 @@ export default function LandingPage() {
                   transition={{ delay: i * 0.08 }}
                   className="glass-card-hover p-6 group relative overflow-hidden"
                 >
-                  {/* Gradient background */}
                   <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", feature.color)} />
 
                   <div className="relative">
@@ -394,10 +416,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* ============================================================ */}
-      {/* TRENDING COMPANIES */}
-      {/* ============================================================ */}
       <section className="py-20 bg-dark-900/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -410,48 +428,58 @@ export default function LandingPage() {
               <h2 className="section-heading">🔥 Trending Companies</h2>
               <p className="section-subheading">Most active interview activity in the last 30 days</p>
             </div>
-            <Link href="/explore" className="btn-ghost text-sm py-2 px-4 hidden sm:flex">
+            <Link href="/companies" className="btn-ghost text-sm py-2 px-4 hidden sm:flex">
               View All <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </motion.div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {TRENDING_COMPANIES.map((company, i) => (
-              <motion.div
-                key={company.slug}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
-              >
-                <Link
-                  href={`/companies/${company.slug}`}
-                  className="glass-card-hover p-5 flex flex-col items-center text-center gap-3 group"
+            {loadingTrending && trendingCompanies.length === 0 ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="glass-card p-5 flex flex-col items-center text-center gap-3 animate-pulse">
+                  <div className="w-12 h-12 rounded-2xl bg-white/[0.06]" />
+                  <div className="space-y-1.5 w-full flex flex-col items-center">
+                    <div className="h-4 bg-white/[0.08] rounded w-20" />
+                    <div className="h-3 bg-white/[0.04] rounded w-14" />
+                  </div>
+                  <div className="h-5 bg-white/[0.04] rounded-full w-12" />
+                </div>
+              ))
+            ) : (
+              trendingCompanies.map((company, i) => (
+                <motion.div
+                  key={company.slug}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.06 }}
                 >
-                  <div className={cn("w-12 h-12 rounded-2xl bg-gradient-to-br flex items-center justify-center text-white font-bold font-display text-lg shadow-lg", company.color)}>
-                    {company.logo}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-white text-sm">{company.name}</div>
-                    <div className="text-slate-500 text-xs mt-0.5">{company.reports} reports</div>
-                  </div>
-                  <span className={cn("text-xs px-2 py-0.5 rounded-full border font-medium",
-                    company.tier === "FAANG"
-                      ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
-                      : "text-brand-400 bg-brand-500/10 border-brand-500/20"
-                  )}>
-                    {company.tier}
-                  </span>
-                </Link>
-              </motion.div>
-            ))}
+                  <Link
+                    href={`/companies/${company.slug}`}
+                    className="glass-card-hover p-5 flex flex-col items-center text-center gap-3 group"
+                  >
+                    <div className={cn("w-12 h-12 rounded-2xl bg-gradient-to-br flex items-center justify-center text-white font-bold font-display text-lg shadow-lg", company.color)}>
+                      {company.logo}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white text-sm">{company.name}</div>
+                      <div className="text-slate-500 text-xs mt-0.5">{company.reports} reports</div>
+                    </div>
+                    <span className={cn("text-xs px-2 py-0.5 rounded-full border font-medium",
+                      company.tier === "FAANG"
+                        ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                        : "text-brand-400 bg-brand-500/10 border-brand-500/20"
+                    )}>
+                      {company.tier}
+                    </span>
+                  </Link>
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      {/* ============================================================ */}
-      {/* TRENDING QUESTIONS */}
-      {/* ============================================================ */}
       <section className="py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -470,48 +498,58 @@ export default function LandingPage() {
           </motion.div>
 
           <div className="space-y-3">
-            {TRENDING_QUESTIONS.map((q, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className="glass-card-hover p-5 flex items-center gap-4 group cursor-pointer"
-              >
-                <div className="w-8 h-8 rounded-lg bg-dark-800 flex items-center justify-center text-slate-500 text-sm font-bold flex-shrink-0 group-hover:bg-brand-500/20 group-hover:text-brand-400 transition-all">
-                  {i + 1}
+            {loadingTrending && trendingQuestions.length === 0 ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="glass-card p-5 flex items-center gap-4 animate-pulse">
+                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-white/[0.08] rounded w-3/4" />
+                    <div className="h-4 bg-white/[0.04] rounded-full w-24" />
+                  </div>
+                  <div className="h-6 bg-white/[0.04] rounded-md w-14 flex-shrink-0" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{q.text}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={cn("badge text-xs",
-                      q.type === "SYSTEM_DESIGN" ? "badge-violet" : "badge-brand"
+              ))
+            ) : (
+              trendingQuestions.map((q, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                  className="glass-card-hover p-5 flex items-center gap-4 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-dark-800 flex items-center justify-center text-slate-500 text-sm font-bold flex-shrink-0 group-hover:bg-brand-500/20 group-hover:text-brand-400 transition-all">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{q.text}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={cn("badge text-xs",
+                        q.type === "SYSTEM_DESIGN" ? "badge-violet" : "badge-brand"
+                      )}>
+                        {q.type.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className={cn("badge",
+                      q.difficulty === "HARD" ? "badge-hard" : "badge-medium"
                     )}>
-                      {q.type.replace("_", " ")}
+                      {q.difficulty}
                     </span>
+                    <div className="text-right hidden sm:block">
+                      <div className="text-white text-sm font-semibold">{q.companies}</div>
+                      <div className="text-slate-600 text-xs">companies</div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className={cn("badge",
-                    q.difficulty === "HARD" ? "badge-hard" : "badge-medium"
-                  )}>
-                    {q.difficulty}
-                  </span>
-                  <div className="text-right hidden sm:block">
-                    <div className="text-white text-sm font-semibold">{q.companies}</div>
-                    <div className="text-slate-600 text-xs">companies</div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      {/* ============================================================ */}
-      {/* TESTIMONIALS */}
-      {/* ============================================================ */}
       <section className="py-20 bg-dark-900/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -555,9 +593,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ============================================================ */}
-      {/* HOW IT WORKS */}
-      {/* ============================================================ */}
       <section className="py-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -619,9 +654,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ============================================================ */}
-      {/* FAQ */}
-      {/* ============================================================ */}
       <section className="py-20 bg-dark-900/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <motion.div
@@ -667,9 +699,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ============================================================ */}
-      {/* CTA SECTION */}
-      {/* ============================================================ */}
       <section className="py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <motion.div

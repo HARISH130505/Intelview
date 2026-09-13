@@ -127,9 +127,49 @@ export interface AnswerEvaluation {
 // AI SERVICE
 // ============================================================
 
+// Types for live company research
+export interface CompanyResearch {
+  company: string;
+  role: string;
+  oaFormat: {
+    platform: string;
+    duration: string;
+    questionTypes: string[];
+    tips: string[];
+  };
+  interviewRounds: {
+    roundNumber: number;
+    type: string;
+    description: string;
+    duration: string;
+    tips: string[];
+  }[];
+  frequentTopics: string[];
+  recentQuestions: {
+    text: string;
+    type: string;
+    difficulty: string;
+    source: string;
+  }[];
+  preparationResources: {
+    title: string;
+    url: string;
+    type: string;
+    description: string;
+  }[];
+  salaryInsights: string;
+  difficulty: string;
+  offerRate: string;
+  timeline: string;
+  insiderTips: string[];
+  sources: string[];
+  researchedAt: string;
+}
+
 class AIService {
   private model: GenerativeModel;
   private fastModel: GenerativeModel;
+  private researchModel: GenerativeModel;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -138,8 +178,18 @@ class AIService {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey || 'placeholder');
-    this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-    this.fastModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    // ✅ Gemini 3.1 Flash-Lite — Bulk extraction and normalization (e.g. interview extraction, resume parsing)
+    this.model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
+
+    // ✅ Gemini 2.5 Flash — User-facing AI features (e.g. roadmaps, mock interviews, chat)
+    this.fastModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // ✅ Gemini 2.5 Flash + Google Search Grounding — Live dynamic company research
+    this.researchModel = genAI.getGenerativeModel(
+      { model: 'gemini-2.5-flash' },
+      { apiVersion: 'v1beta' }
+    );
   }
 
   // ============================================================
@@ -200,6 +250,134 @@ Extract and return ONLY a valid JSON object with this exact structure:
 }
 
 Return ONLY the JSON, no markdown, no explanation.`;
+  }
+
+  // ============================================================
+  // LIVE COMPANY RESEARCH (Google Search Grounding)
+  // ============================================================
+
+  async researchCompany(company: string, role: string): Promise<CompanyResearch> {
+    const prompt = `You are an expert career intelligence analyst. Research the current (2025-2026) interview process for "${company}" for the role "${role}".
+
+Using your search capability, find and analyze:
+1. Recent interview experiences from Reddit (r/cscareerquestions, r/leetcode, r/${company.toLowerCase().replace(/\s+/g, '')}), LeetCode Discuss, Glassdoor, and LinkedIn.
+2. Online Assessment (OA) format — platform used (HackerRank/CodeSignal/Glider), question count, time limit, difficulty distribution.
+3. All interview rounds — types, duration, difficulty, what interviewers focus on.
+4. Most frequently asked coding questions and topics in 2025-2026.
+5. Specific preparation resources with real URLs.
+6. Offer rates, salary ranges, and interview timeline.
+
+Return ONLY a valid JSON object with this exact structure:
+{
+  "company": "${company}",
+  "role": "${role}",
+  "oaFormat": {
+    "platform": "HackerRank",
+    "duration": "90 minutes",
+    "questionTypes": ["2 DSA problems (Medium/Hard)", "1 SQL query"],
+    "tips": ["Focus on optimal time complexity", "Test edge cases"]
+  },
+  "interviewRounds": [
+    {
+      "roundNumber": 1,
+      "type": "ONLINE_ASSESSMENT",
+      "description": "2 LeetCode Medium/Hard problems",
+      "duration": "90 min",
+      "tips": ["Write brute force first then optimize"]
+    },
+    {
+      "roundNumber": 2,
+      "type": "TECHNICAL",
+      "description": "DSA + problem solving with live coding",
+      "duration": "45-60 min",
+      "tips": ["Think aloud", "Ask clarifying questions"]
+    }
+  ],
+  "frequentTopics": ["Dynamic Programming", "Trees", "Graphs", "System Design", "Arrays"],
+  "recentQuestions": [
+    {
+      "text": "Specific question text seen in recent interviews",
+      "type": "CODING",
+      "difficulty": "MEDIUM",
+      "source": "Reddit r/cscareerquestions (2025)"
+    }
+  ],
+  "preparationResources": [
+    {
+      "title": "Resource name",
+      "url": "https://actual-url.com",
+      "type": "practice|video|article|book",
+      "description": "Why this resource is relevant for this company"
+    }
+  ],
+  "salaryInsights": "SDE-1: ₹25-40 LPA | SDE-2: ₹45-80 LPA (includes stock)",
+  "difficulty": "HARD",
+  "offerRate": "~5-8% from OA to offer",
+  "timeline": "OA → 2-3 Technical rounds → HR → 3-5 weeks total",
+  "insiderTips": [
+    "Specific insider tip based on recent experiences"
+  ],
+  "sources": ["Reddit thread URL", "LeetCode discuss URL"],
+  "researchedAt": "${new Date().toISOString()}"
+}
+
+Be specific with real questions and accurate URLs. Prioritize 2025-2026 data. Return ONLY the JSON.`;
+
+    try {
+      // Call Gemini 2.5 Pro with Google Search Grounding enabled
+      const result = await this.researchModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} } as any],
+      });
+
+      const text = result.response.text();
+      const parsed = this.parseJSON<CompanyResearch>(text, this.defaultCompanyResearch(company, role));
+
+      // Attach grounding sources if available
+      const groundingMetadata = (result.response as any).candidates?.[0]?.groundingMetadata;
+      if (groundingMetadata?.webSearchQueries) {
+        console.log(`🔍 Gemini searched: ${groundingMetadata.webSearchQueries.join(', ')}`);
+      }
+      if (groundingMetadata?.groundingChunks) {
+        const sourceUrls = groundingMetadata.groundingChunks
+          .map((chunk: any) => chunk.web?.uri)
+          .filter(Boolean);
+        if (sourceUrls.length > 0) parsed.sources = sourceUrls;
+      }
+
+      parsed.researchedAt = new Date().toISOString();
+      return parsed;
+    } catch (error) {
+      console.error('Company research error:', error);
+      return this.defaultCompanyResearch(company, role);
+    }
+  }
+
+  private defaultCompanyResearch(company: string, role: string): CompanyResearch {
+    return {
+      company,
+      role,
+      oaFormat: {
+        platform: 'HackerRank',
+        duration: 'Varies',
+        questionTypes: ['DSA problems'],
+        tips: ['Practice consistently'],
+      },
+      interviewRounds: [],
+      frequentTopics: ['Arrays', 'Dynamic Programming', 'System Design'],
+      recentQuestions: [],
+      preparationResources: [
+        { title: 'LeetCode', url: 'https://leetcode.com', type: 'practice', description: 'Primary DSA practice platform' },
+        { title: 'NeetCode', url: 'https://neetcode.io', type: 'video', description: 'Structured problem-solving roadmap' },
+      ],
+      salaryInsights: 'Check Glassdoor for latest compensation data.',
+      difficulty: 'MEDIUM',
+      offerRate: 'Data being gathered...',
+      timeline: 'Typically 4-6 weeks from application to offer.',
+      insiderTips: ['Prepare thoroughly', 'Practice mock interviews'],
+      sources: [],
+      researchedAt: new Date().toISOString(),
+    };
   }
 
   // ============================================================

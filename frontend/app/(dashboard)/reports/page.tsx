@@ -1,105 +1,325 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { FileText, Search, Filter, CheckCircle, XCircle, Clock, Plus } from "lucide-react";
-import { reportsAPI } from "@/lib/api";
+import {
+  FileText,
+  Search,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Plus,
+  Filter,
+  Sparkles,
+  Building2,
+  ChevronRight,
+  Layers,
+  HelpCircle,
+} from "lucide-react";
+import { reportsAPI, companiesAPI } from "@/lib/api";
 import { cn, getDifficultyColor, formatDate } from "@/lib/utils";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
 
-const MOCK_REPORTS = [
-  { id: "1", role: "Software Engineer II", difficulty: "HARD", offerStatus: "ACCEPTED", createdAt: "2025-06-10", company: { name: "Google", slug: "google" }, rounds: [{}, {}, {}], _count: { questions: 8 }, experience: "3 rounds of coding, then system design. Focus was on dynamic programming and graph algorithms." },
-  { id: "2", role: "SDE-1", difficulty: "MEDIUM", offerStatus: "PENDING", createdAt: "2025-06-08", company: { name: "Amazon", slug: "amazon" }, rounds: [{}, {}], _count: { questions: 5 }, experience: "Two technical rounds with LP questions interspersed. Strong focus on leadership principles." },
-  { id: "3", role: "Senior Software Engineer", difficulty: "VERY_HARD", offerStatus: "REJECTED", createdAt: "2025-06-05", company: { name: "Meta", slug: "meta" }, rounds: [{}, {}, {}, {}], _count: { questions: 12 }, experience: "4 rounds including system design at scale. They expect you to handle billions of users in your design." },
-  { id: "4", role: "Backend Engineer", difficulty: "MEDIUM", offerStatus: "ACCEPTED", createdAt: "2025-06-01", company: { name: "Flipkart", slug: "flipkart" }, rounds: [{}, {}], _count: { questions: 6 }, experience: "More practical and product-focused. Good communication skills matter here." },
-];
+const OFFER_STATUS_CONFIG: Record<
+  string,
+  { icon: any; color: string; label: string; bg: string }
+> = {
+  ACCEPTED: {
+    icon: CheckCircle,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10 border-emerald-500/20",
+    label: "Offer Received",
+  },
+  REJECTED: {
+    icon: XCircle,
+    color: "text-rose-400",
+    bg: "bg-rose-500/10 border-rose-500/20",
+    label: "No Offer",
+  },
+  PENDING: {
+    icon: Clock,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10 border-amber-500/20",
+    label: "Pending",
+  },
+  UNKNOWN: {
+    icon: HelpCircle,
+    color: "text-slate-400",
+    bg: "bg-slate-500/10 border-slate-500/20",
+    label: "Unknown",
+  },
+};
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState(MOCK_REPORTS);
+  const [reports, setReports] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("ALL");
+  const [selectedStatus, setSelectedStatus] = useState("ALL");
+  const [selectedCompany, setSelectedCompany] = useState("ALL");
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    reportsAPI.getAll({ limit: 20 }).then(d => { if (d.reports?.length > 0) setReports(d.reports); }).catch(() => {});
-  }, []);
-
-  const OFFER_STATUS_CONFIG: Record<string, { icon: any; color: string; label: string }> = {
-    ACCEPTED: { icon: CheckCircle, color: "text-emerald-400", label: "Offer Received" },
-    REJECTED: { icon: XCircle, color: "text-rose-400", label: "No Offer" },
-    PENDING: { icon: Clock, color: "text-amber-400", label: "Pending" },
-    UNKNOWN: { icon: Clock, color: "text-slate-400", label: "Unknown" },
+  const fetchReports = () => {
+    setLoading(true);
+    reportsAPI
+      .getAll({ limit: 50 })
+      .then((d) => {
+        if (d.reports && d.reports.length > 0) {
+          setReports(d.reports);
+        } else {
+          setReports([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load reports:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
-  const filtered = reports.filter(r => !search || r.role.toLowerCase().includes(search.toLowerCase()) || r.company?.name.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    fetchReports();
+    companiesAPI
+      .getAll({ limit: 50 })
+      .then((d) => {
+        if (d.companies) setCompanies(d.companies);
+      })
+      .catch(() => {});
+  }, []);
+
+  const filtered = reports.filter((r) => {
+    const matchesSearch =
+      !search ||
+      r.role?.toLowerCase().includes(search.toLowerCase()) ||
+      r.company?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      r.experience?.toLowerCase().includes(search.toLowerCase());
+
+    const matchesDiff =
+      selectedDifficulty === "ALL" || r.difficulty === selectedDifficulty;
+
+    const matchesStatus =
+      selectedStatus === "ALL" || r.offerStatus === selectedStatus;
+
+    const matchesCompany =
+      selectedCompany === "ALL" ||
+      r.company?.slug === selectedCompany ||
+      r.company?.name === selectedCompany;
+
+    return matchesSearch && matchesDiff && matchesStatus && matchesCompany;
+  });
 
   return (
-    <div className="min-h-screen bg-dark-950">
-      <Navbar />
-      <div className="pt-16">
-        <div className="border-b border-white/[0.06] bg-dark-900/50 relative">
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-12">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-4">
-                  <FileText className="w-3.5 h-3.5" /> Community Reports
-                </div>
-                <h1 className="text-4xl font-black font-display text-white mb-2">Interview Reports</h1>
-                <p className="text-slate-400">Real experiences from the community, analyzed by AI</p>
-              </div>
-              <Link href="/reports/submit" className="btn-brand text-sm py-2.5 px-5 flex-shrink-0">
-                <Plus className="w-4 h-4" /> Share Experience
-              </Link>
+    <div className="space-y-6 pb-12">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-3"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-2">
+              <FileText className="w-3.5 h-3.5" /> Community Intelligence
             </div>
-            <div className="mt-6 relative max-w-xl">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input type="text" placeholder="Search by company or role..." value={search} onChange={e => setSearch(e.target.value)} className="input-dark pl-12 py-4" />
-            </div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white">
+              Interview Reports
+            </h1>
+            <p className="text-slate-400 text-xs sm:text-sm">
+              Real candidate interview loops, questions asked, and hiring outcomes.
+            </p>
           </div>
+
+          <Link
+            href="/reports/submit"
+            className="btn-brand text-xs sm:text-sm py-2.5 px-4 self-start sm:self-auto inline-flex items-center gap-2 shadow-lg shadow-brand-500/20"
+          >
+            <Plus className="w-4 h-4" /> Share Experience
+          </Link>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-4">
-          {filtered.map((report, i) => {
-            const statusConfig = OFFER_STATUS_CONFIG[report.offerStatus] || OFFER_STATUS_CONFIG.UNKNOWN;
+        {/* Search & Filters Bar */}
+        <div className="flex flex-col lg:flex-row gap-3 pt-2">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search by company, role, or keywords..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-dark pl-10 py-2.5 text-xs sm:text-sm w-full"
+            />
+          </div>
+
+          {/* Company Filter Dropdown */}
+          <select
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            className="bg-slate-900/80 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
+          >
+            <option value="ALL">All Companies</option>
+            {companies.map((c) => (
+              <option key={c.id || c.slug} value={c.slug}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Difficulty Filter */}
+          <select
+            value={selectedDifficulty}
+            onChange={(e) => setSelectedDifficulty(e.target.value)}
+            className="bg-slate-900/80 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
+          >
+            <option value="ALL">All Difficulties</option>
+            <option value="EASY">Easy</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HARD">Hard</option>
+            <option value="VERY_HARD">Brutal</option>
+          </select>
+
+          {/* Offer Status Filter */}
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="bg-slate-900/80 border border-white/[0.1] rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
+          >
+            <option value="ALL">All Outcomes</option>
+            <option value="ACCEPTED">Offer Received</option>
+            <option value="REJECTED">No Offer</option>
+            <option value="PENDING">Pending</option>
+          </select>
+        </div>
+      </motion.div>
+
+      {/* Reports List */}
+      <div className="space-y-3">
+        {loading && reports.length === 0 ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="glass-card p-4 sm:p-5 flex flex-col sm:flex-row items-start gap-4 animate-pulse"
+            >
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/[0.06] flex-shrink-0" />
+              <div className="flex-1 space-y-2.5 w-full">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="h-4 bg-white/[0.08] rounded w-1/3" />
+                  <div className="h-5 bg-white/[0.04] rounded-full w-20" />
+                </div>
+                <div className="h-3 bg-white/[0.04] rounded w-full" />
+                <div className="h-3 bg-white/[0.03] rounded w-2/3" />
+              </div>
+            </div>
+          ))
+        ) : filtered.length === 0 ? (
+          <div className="glass-card p-10 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center mx-auto">
+              <FileText className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-white">
+              No interview reports found
+            </h3>
+            <p className="text-slate-400 text-xs sm:text-sm max-w-sm mx-auto">
+              Be the first to share an interview experience for this role and unlock insights for the community!
+            </p>
+            <Link
+              href="/reports/submit"
+              className="btn-brand text-xs py-2 px-4 inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> Share First Experience
+            </Link>
+          </div>
+        ) : (
+          filtered.map((report, i) => {
+            const statusConfig =
+              OFFER_STATUS_CONFIG[report.offerStatus] ||
+              OFFER_STATUS_CONFIG.UNKNOWN;
             const StatusIcon = statusConfig.icon;
+
             return (
-              <motion.div key={report.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                <Link href={`/reports/${report.id}`} className="glass-card-hover p-6 flex gap-5 group">
-                  {/* Company Logo */}
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                    {report.company?.name?.charAt(0)}
+              <motion.div
+                key={report.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.25) }}
+              >
+                <Link
+                  href={`/reports/${report.id}`}
+                  className="block glass-card-hover p-4 sm:p-5 flex flex-col sm:flex-row items-start gap-4 transition-all group"
+                >
+                  {/* Company Logo / Initial */}
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-brand-600 to-violet-600 flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-md group-hover:scale-105 transition-transform">
+                    {report.company?.name?.charAt(0) || "C"}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex items-start justify-between gap-2 flex-wrap mb-1.5">
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-bold">{report.company?.name}</span>
-                          <span className="text-slate-600">·</span>
-                          <span className="text-slate-300 text-sm">{report.role}</span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={cn("badge text-xs", getDifficultyColor(report.difficulty))}>{report.difficulty}</span>
-                          <span className="text-slate-600 text-xs">{report.rounds?.length || 0} rounds</span>
-                          <span className="text-slate-600 text-xs">{report._count?.questions || 0} questions</span>
-                          <span className="text-slate-600 text-xs">{formatDate(report.createdAt)}</span>
-                        </div>
+                        <h3 className="text-white font-bold text-sm sm:text-base group-hover:text-brand-300 transition-colors flex items-center gap-1.5">
+                          <span>{report.role}</span>
+                          <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all text-brand-400" />
+                        </h3>
+                        <p className="text-brand-400 font-medium text-xs">
+                          {report.company?.name}
+                        </p>
                       </div>
-                      <div className={cn("flex items-center gap-1.5 text-sm font-medium flex-shrink-0", statusConfig.color)}>
-                        <StatusIcon className="w-4 h-4" />
-                        {statusConfig.label}
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "badge text-xs",
+                            getDifficultyColor(report.difficulty)
+                          )}
+                        >
+                          {report.difficulty}
+                        </span>
+                        <span
+                          className={cn(
+                            "badge text-xs flex items-center gap-1 border",
+                            statusConfig.color,
+                            statusConfig.bg
+                          )}
+                        >
+                          <StatusIcon className="w-3 h-3" />
+                          <span className="hidden sm:inline">
+                            {statusConfig.label}
+                          </span>
+                        </span>
                       </div>
                     </div>
-                    <p className="text-slate-400 text-sm mt-3 line-clamp-2">{report.experience}</p>
+
+                    <p className="text-slate-400 text-xs sm:text-sm line-clamp-2 leading-relaxed mb-3 font-sans">
+                      &ldquo;{report.experience || report.rawText}&rdquo;
+                    </p>
+
+                    <div className="flex items-center justify-between text-slate-500 text-[11px] pt-2 border-t border-white/[0.04]">
+                      <div className="flex items-center gap-3">
+                        <span>
+                          {report._count?.questions || report.questions?.length || 0} questions
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {report.rounds?.length || 0} rounds
+                        </span>
+                        {report.helpfulCount > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-400">
+                              👍 {report.helpfulCount} helpful
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <span>{formatDate(report.createdAt)}</span>
+                    </div>
                   </div>
                 </Link>
               </motion.div>
             );
-          })}
-        </div>
+          })
+        )}
       </div>
-      <Footer />
     </div>
   );
 }

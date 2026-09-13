@@ -33,6 +33,7 @@
 
   html {
     @apply antialiased scroll-smooth;
+    overflow-x: hidden;
   }
 
   body {
@@ -41,6 +42,8 @@
       radial-gradient(ellipse at 10% 20%, rgba(37, 99, 235, 0.08) 0%, transparent 50%),
       radial-gradient(ellipse at 90% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
     min-height: 100vh;
+    overflow-x: hidden;
+    width: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {

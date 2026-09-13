@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -11,96 +12,142 @@ import {
   Mic,
   Upload,
   Map,
-  BookOpen,
   Target,
-  Star,
+  Users,
+  Loader2,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { analyticsAPI } from "@/lib/api";
 
 const QUICK_ACTIONS = [
-  { icon: Building2, label: "Company Explorer", desc: "Browse company intelligence", href: "/companies", color: "text-brand-400", bg: "bg-brand-500/10" },
-  { icon: Code2, label: "Question Bank", desc: "50K+ indexed questions", href: "/questions", color: "text-violet-400", bg: "bg-violet-500/10" },
-  { icon: Upload, label: "Analyze Resume", desc: "Get ATS score instantly", href: "/resume", color: "text-amber-400", bg: "bg-amber-500/10" },
-  { icon: Mic, label: "Mock Interview", desc: "AI-powered practice", href: "/mock-interview", color: "text-rose-400", bg: "bg-rose-500/10" },
-  { icon: Map, label: "Study Planner", desc: "Personalized roadmap", href: "/planner", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  { icon: FileText, label: "Reports", desc: "Real interview experiences", href: "/reports", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+  { icon: Building2, label: "Company Explorer", desc: "Browse real tech companies", href: "/companies", color: "text-brand-400", bg: "bg-brand-500/10" },
+  { icon: Code2, label: "Question Bank", desc: "Real interview questions", href: "/questions", color: "text-violet-400", bg: "bg-violet-500/10" },
+  { icon: Upload, label: "Resume Analyzer", desc: "Instant ATS score & skill gap", href: "/resume", color: "text-amber-400", bg: "bg-amber-500/10" },
+  { icon: Map, label: "Study Planner", desc: "Personalized AI roadmap", href: "/planner", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  { icon: Mic, label: "Mock Interview", desc: "Simulated technical interview", href: "/mock-interview", color: "text-rose-400", bg: "bg-rose-500/10" },
+  { icon: FileText, label: "Interview Reports", desc: "Community experiences", href: "/reports", color: "text-cyan-400", bg: "bg-cyan-500/10" },
 ];
 
-const TRENDING_TOPICS = [
-  { name: "Dynamic Programming", count: 1243, color: "badge-brand" },
-  { name: "System Design", count: 987, color: "badge-violet" },
-  { name: "Trees & Graphs", count: 876, color: "badge-emerald" },
-  { name: "Arrays & Strings", count: 1456, color: "badge-amber" },
-  { name: "Behavioral", count: 654, color: "badge-rose" },
-  { name: "LLD/OOD", count: 432, color: "badge-brand" },
+const TOPIC_BADGE_COLORS = [
+  "badge-brand", "badge-violet", "badge-emerald", "badge-amber", "badge-rose", "badge-brand"
 ];
 
-const RECENT_ACTIVITY = [
-  { action: "New report added", company: "Google", role: "SDE-2", time: "2 hours ago" },
-  { action: "10 new questions", company: "Amazon", role: "SDE-1", time: "5 hours ago" },
-  { action: "New report added", company: "Microsoft", role: "Software Engineer", time: "1 day ago" },
-  { action: "Company updated", company: "Flipkart", role: "Backend Engineer", time: "2 days ago" },
+const DEFAULT_TOPICS = [
+  { name: "Dynamic Programming", count: "30+" },
+  { name: "System Design", count: "25+" },
+  { name: "Trees & Graphs", count: "20+" },
+  { name: "Arrays & Strings", count: "40+" },
+  { name: "Behavioral & STAR", count: "15+" },
+  { name: "Low Level Design", count: "10+" },
 ];
 
 export default function DashboardPage() {
   const { user } = useUser();
   const firstName = user?.firstName || "there";
 
+  const [stats, setStats] = useState<{
+    totalCompanies: number;
+    totalQuestions: number;
+    totalReports: number;
+    totalUsers: number;
+  }>({
+    totalCompanies: 27,
+    totalQuestions: 59,
+    totalReports: 0,
+    totalUsers: 1,
+  });
+  const [loading, setLoading] = useState(true);
+  const [topics, setTopics] = useState<{ name: string; count: string | number }[]>(DEFAULT_TOPICS);
+  const [topCompanies, setTopCompanies] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const [overviewRes, trendingRes] = await Promise.all([
+          analyticsAPI.getOverview().catch(() => null),
+          analyticsAPI.getTrending().catch(() => null),
+        ]);
+
+        if (overviewRes?.stats) {
+          setStats(overviewRes.stats);
+        }
+
+        if (trendingRes?.data?.topTopics?.length > 0) {
+          setTopics(
+            trendingRes.data.topTopics.slice(0, 6).map((t: any) => ({
+              name: t.name,
+              count: t._count?.questionTopics || 0,
+            }))
+          );
+        }
+
+        if (trendingRes?.data?.topCompanies?.length > 0) {
+          setTopCompanies(trendingRes.data.topCompanies);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, []);
+
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <div className="space-y-6 sm:space-y-8">
+      {/* Welcome Header */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between"
+        className="space-y-1.5"
       >
-        <div>
-          <h1 className="text-3xl font-bold font-display text-white">
-            Welcome back, {firstName} 👋
-          </h1>
-          <p className="text-slate-400 mt-1">
-            Your interview intelligence hub — everything you need to prepare smarter.
-          </p>
-        </div>
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white">
+          Welcome back, {firstName} 👋
+        </h1>
+        <p className="text-slate-400 text-xs sm:text-sm max-w-2xl">
+          Everything you need to master your next technical interview in one place.
+        </p>
       </motion.div>
 
-      {/* Stats Row */}
+      {/* Stats Cards Row (2 col on mobile, 4 col on desktop) */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
       >
         {[
-          { label: "Companies", value: "500+", icon: Building2, color: "text-brand-400" },
-          { label: "Questions", value: "50K+", icon: Code2, color: "text-violet-400" },
-          { label: "Reports", value: "12K+", icon: FileText, color: "text-emerald-400" },
-          { label: "Your Score", value: "—", icon: Target, color: "text-amber-400" },
-        ].map((stat, i) => {
+          { label: "Companies", value: `${stats.totalCompanies}`, icon: Building2, color: "text-brand-400" },
+          { label: "Questions", value: `${stats.totalQuestions}`, icon: Code2, color: "text-violet-400" },
+          { label: "Reports", value: `${stats.totalReports}`, icon: FileText, color: "text-emerald-400" },
+          { label: "Members", value: `${stats.totalUsers}`, icon: Users, color: "text-amber-400" },
+        ].map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="glass-card p-5">
-              <div className="flex items-center justify-between mb-3">
-                <Icon className={cn("w-5 h-5", stat.color)} />
+            <div key={stat.label} className="glass-card p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-2">
+                <Icon className={cn("w-4 h-4 sm:w-5 sm:h-5", stat.color)} />
               </div>
-              <div className="text-2xl font-bold font-display text-white">{stat.value}</div>
-              <div className="text-slate-500 text-xs mt-1">{stat.label}</div>
+              {loading ? (
+                <div className="h-7 sm:h-8 bg-white/[0.08] rounded-lg w-16 animate-pulse my-1" />
+              ) : (
+                <div className="text-xl sm:text-2xl font-bold font-display text-white">{stat.value}</div>
+              )}
+              <div className="text-slate-500 text-[11px] sm:text-xs mt-0.5">{stat.label}</div>
             </div>
           );
         })}
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions (1 col on mobile, 2 col on tablet, 3 col on desktop) */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.15 }}
+        className="space-y-3"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold font-display text-white">Quick Actions</h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <h2 className="text-base sm:text-lg font-bold font-display text-white">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {QUICK_ACTIONS.map((action, i) => {
             const Icon = action.icon;
             return (
@@ -108,22 +155,22 @@ export default function DashboardPage() {
                 key={action.label}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 + i * 0.05 }}
+                transition={{ delay: 0.15 + i * 0.03 }}
               >
                 <Link
                   href={action.href}
-                  className="glass-card-hover p-5 flex items-start gap-4 group"
+                  className="glass-card-hover p-4 sm:p-5 flex items-center gap-3.5 group h-full block"
                 >
                   <div className={cn("p-2.5 rounded-xl flex-shrink-0", action.bg)}>
                     <Icon className={cn("w-5 h-5", action.color)} />
                   </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-white text-sm group-hover:text-brand-300 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white text-sm sm:text-base group-hover:text-brand-300 transition-colors">
                       {action.label}
                     </div>
-                    <div className="text-slate-500 text-xs mt-0.5">{action.desc}</div>
+                    <div className="text-slate-500 text-xs truncate mt-0.5">{action.desc}</div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-brand-400 flex-shrink-0 mt-0.5 transition-all group-hover:translate-x-0.5" />
+                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-brand-400 flex-shrink-0 transition-all group-hover:translate-x-0.5" />
                 </Link>
               </motion.div>
             );
@@ -131,88 +178,99 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* Bottom Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Trending Topics */}
+      {/* Bottom Grid (1 col on mobile/tablet, 2 col on desktop) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Trending Topics — live from DB via /api/analytics/trending */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="glass-card p-6"
+          transition={{ delay: 0.2 }}
+          className="glass-card p-4 sm:p-6"
         >
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold font-display text-white">🔥 Trending Topics</h3>
-            <TrendingUp className="w-4 h-4 text-slate-500" />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold font-display text-white text-sm sm:text-base">🔥 Top Interview Topics</h3>
+            <TrendingUp className="w-4 h-4 text-brand-400" />
           </div>
-          <div className="space-y-3">
-            {TRENDING_TOPICS.map((topic, i) => (
-              <div key={topic.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-600 text-xs w-4">{i + 1}</span>
-                  <span className="text-slate-300 text-sm">{topic.name}</span>
+          <div className="space-y-2.5">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-7 bg-white/[0.04] rounded-lg animate-pulse" />
+              ))
+            ) : (
+              topics.map((topic, i) => (
+                <div key={topic.name} className="flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 truncate pr-2">
+                    <span className="text-slate-600 text-xs w-4">{i + 1}</span>
+                    <span className="text-slate-300 truncate">{topic.name}</span>
+                  </div>
+                  <span className={cn("badge text-[11px] flex-shrink-0", TOPIC_BADGE_COLORS[i % TOPIC_BADGE_COLORS.length])}>
+                    {topic.count} questions
+                  </span>
                 </div>
-                <span className={cn("badge text-xs", topic.color)}>{topic.count}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </motion.div>
 
-        {/* Recent Activity */}
+        {/* Live Top Companies from DB */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="glass-card p-6 lg:col-span-2"
+          transition={{ delay: 0.25 }}
+          className="glass-card p-4 sm:p-6"
         >
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold font-display text-white">Recent Activity</h3>
-            <Link href="/reports" className="text-brand-400 text-xs hover:underline flex items-center gap-1">
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold font-display text-white text-sm sm:text-base">🏢 Tracked Tech Companies</h3>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           </div>
-          <div className="space-y-3">
-            {RECENT_ACTIVITY.map((item, i) => (
-              <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-dark-800/50 border border-white/[0.04]">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-4 h-4 text-brand-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white text-sm font-medium">{item.action}</span>
-                    <span className="badge badge-brand text-xs">{item.company}</span>
+          <div className="space-y-2.5">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-12 bg-white/[0.04] rounded-xl animate-pulse" />
+              ))
+            ) : topCompanies.length > 0 ? (
+              topCompanies.slice(0, 5).map((comp: any, i: number) => (
+                <Link
+                  key={comp.id || i}
+                  href={`/companies/${comp.slug}`}
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-dark-800/40 border border-white/[0.04] hover:border-brand-500/20 transition-all group"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="text-white text-xs sm:text-sm font-medium group-hover:text-brand-300 transition-colors">
+                      {comp.name}
+                    </div>
+                    <div className="text-slate-500 text-[11px] mt-0.5">{comp.industry || "Technology"} • {comp.tier}</div>
                   </div>
-                  <div className="text-slate-500 text-xs mt-0.5">{item.role} • {item.time}</div>
-                </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-brand-400 transition-colors flex-shrink-0" />
+                </Link>
+              ))
+            ) : (
+              <div className="space-y-2">
+                {[
+                  { name: "Google", desc: "Technology • FAANG", slug: "google" },
+                  { name: "Amazon", desc: "E-Commerce & Cloud • FAANG", slug: "amazon" },
+                  { name: "Microsoft", desc: "Technology • FAANG", slug: "microsoft" },
+                  { name: "Meta", desc: "Social Media • FAANG", slug: "meta" },
+                ].map((c) => (
+                  <Link
+                    key={c.slug}
+                    href={`/companies/${c.slug}`}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-dark-800/40 border border-white/[0.04] hover:border-brand-500/20 transition-all group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="text-white text-xs sm:text-sm font-medium group-hover:text-brand-300 transition-colors">
+                        {c.name}
+                      </div>
+                      <div className="text-slate-500 text-[11px] mt-0.5">{c.desc}</div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-brand-400 transition-colors flex-shrink-0" />
+                  </Link>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </motion.div>
       </div>
-
-      {/* AI Recommendation Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="relative gradient-border p-6 overflow-hidden"
-      >
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-brand-500/10 to-violet-500/10" />
-        <div className="relative flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center flex-shrink-0">
-            <Star className="w-6 h-6 text-white" fill="currentColor" />
-          </div>
-          <div className="flex-1">
-            <div className="text-white font-bold">AI Recommendation</div>
-            <p className="text-slate-400 text-sm mt-0.5">
-              Based on current trends, <span className="text-white font-medium">Dynamic Programming</span> and{" "}
-              <span className="text-white font-medium">System Design</span> are the most important topics for your target companies.
-            </p>
-          </div>
-          <Link href="/planner" className="btn-brand text-sm py-2 px-4 flex-shrink-0">
-            Generate Plan <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      </motion.div>
     </div>
   );
 }

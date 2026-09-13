@@ -18,6 +18,7 @@ import searchRoutes from './routes/search';
 import analyticsRoutes from './routes/analytics';
 import adminRoutes from './routes/admin';
 import profileRoutes from './routes/profile';
+import researchRoutes from './routes/research';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/research', researchRoutes); // 🔍 Live Gemini Search Grounding
 
 // ============================================================
 // ERROR HANDLING

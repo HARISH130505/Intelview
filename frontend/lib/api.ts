@@ -44,6 +44,7 @@ export const companiesAPI = {
 // Questions
 export const questionsAPI = {
   getAll: (params?: any) => api.get("/questions", { params }).then((r) => r.data),
+  getFilters: () => api.get("/questions/filters").then((r) => r.data),
   getTrending: (limit?: number) => api.get("/questions/trending", { params: { limit } }).then((r) => r.data),
   getById: (id: string) => api.get(`/questions/${id}`).then((r) => r.data),
 };
@@ -53,6 +54,7 @@ export const reportsAPI = {
   getAll: (params?: any) => api.get("/reports", { params }).then((r) => r.data),
   getById: (id: string) => api.get(`/reports/${id}`).then((r) => r.data),
   submit: (data: any) => api.post("/reports", data).then((r) => r.data),
+  extractAI: (rawText: string) => api.post("/reports/extract", { rawText }).then((r) => r.data),
   markHelpful: (id: string) => api.post(`/reports/${id}/helpful`).then((r) => r.data),
 };
 
@@ -113,6 +115,16 @@ export const adminAPI = {
   rejectReport: (id: string) => api.put(`/admin/reports/${id}/reject`).then((r) => r.data),
   getUsers: (page?: number) => api.get("/admin/users", { params: { page } }).then((r) => r.data),
   createCompany: (data: any) => api.post("/admin/companies", data).then((r) => r.data),
+};
+
+// Live Research (Gemini 2.5 Flash + Google Search Grounding)
+export const researchAPI = {
+  // Get live company intelligence for a role (cached for 30 days)
+  getCompanyIntelligence: (slug: string, role?: string, refresh?: boolean) =>
+    api.get(`/research/${slug}`, { params: { role, refresh } }).then((r) => r.data),
+  // Force-refresh research (admin only)
+  refreshResearch: (slug: string, role?: string) =>
+    api.post(`/research/${slug}/refresh`, { role }).then((r) => r.data),
 };
 
 export default api;

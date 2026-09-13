@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   UserButton,
   Show,
@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  LayoutDashboard,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -23,56 +24,77 @@ const navLinks = [
   { label: "Reports", href: "/reports" },
 ];
 
-export function Navbar() {
+interface NavbarProps {
+  onOpenMobileSidebar?: () => void;
+  showMobileSidebarToggle?: boolean;
+}
+
+export function Navbar({
+  onOpenMobileSidebar,
+  showMobileSidebarToggle = false,
+}: NavbarProps) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="fixed top-0 left-0 right-0 z-50 h-16"
-    >
-      <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-xl border-b border-white/[0.06]" />
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <span className="font-display font-bold text-xl text-white">
-            Intel<span className="gradient-text">view</span>
-          </span>
-        </Link>
-
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                (link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href))
-                  ? "text-white bg-white/[0.08]"
-                  : "text-slate-400 hover:text-white hover:bg-white/[0.05]"
-              )}
+    <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-dark-950/90 backdrop-blur-xl border-b border-white/[0.08]">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-full flex items-center justify-between gap-2">
+        {/* Left: Mobile Sidebar Trigger + Logo */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {showMobileSidebarToggle && onOpenMobileSidebar && (
+            <button
+              onClick={onOpenMobileSidebar}
+              className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+              aria-label="Open sidebar navigation"
             >
-              {link.label}
-            </Link>
-          ))}
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
+          <Link href="/" className="flex items-center gap-2 group">
+            <span className="font-display font-bold text-lg sm:text-xl text-white tracking-tight">
+              Intel<span className="gradient-text">view</span>
+            </span>
+          </Link>
+        </div>
+
+        {/* Desktop Nav Links (Hidden on mobile/tablet) */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navLinks.map((link) => {
+            const isActive =
+              link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-xl text-md sm:text-sm font-medium transition-all duration-150",
+                  isActive
+                    ? "text-white bg-white/[0.08]"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
-        {/* Right section */}
-        <div className="flex items-center gap-3">
+        {/* Right Section: Search + Auth */}
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <Link
             href="/search"
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] transition-all duration-200"
+            className="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all flex items-center gap-2 text-sm"
+            aria-label="Search"
           >
             <Search className="w-4 h-4" />
+            <span className="hidden sm:inline text-xs text-slate-500 font-normal">Search...</span>
           </Link>
 
           <Show when="signed-in">
             <Link
               href="/dashboard"
-              className="hidden sm:flex btn-ghost text-sm py-2 px-4"
+              className="hidden sm:inline-flex btn-ghost text-xs py-1.5 px-3.5"
             >
               Dashboard
             </Link>
@@ -86,51 +108,78 @@ export function Navbar() {
           </Show>
 
           <Show when="signed-out">
-            <Link href="/sign-in" className="btn-ghost text-sm py-2 px-4">
+            <Link
+              href="/sign-in"
+              className="btn-ghost text-xs sm:text-sm py-1.5 sm:py-2 px-2.5 sm:px-4"
+            >
               Sign In
             </Link>
-            <Link href="/sign-up" className="btn-brand text-sm py-2 px-4">
-              Get Started <ChevronRight className="w-3.5 h-3.5" />
+            <Link
+              href="/sign-up"
+              className="btn-brand text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4"
+            >
+              <span>Get Started</span>
+              <ChevronRight className="w-3.5 h-3.5 hidden sm:inline" />
             </Link>
           </Show>
 
-          {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05]"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          {/* Mobile Main Menu Toggle (when not showing mobile sidebar toggle) */}
+          {!showMobileSidebarToggle && (
+            <button
+              className="md:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {mobileOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="absolute top-16 left-0 right-0 bg-dark-900/95 backdrop-blur-xl border-b border-white/[0.06] p-4 md:hidden"
-        >
-          <nav className="flex flex-col gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "px-4 py-3 rounded-xl text-sm font-medium transition-all",
-                  (link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href))
-                    ? "text-white bg-brand-500/15 border border-brand-500/20"
-                    : "text-slate-400 hover:text-white hover:bg-white/[0.05]"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </motion.div>
-      )}
-    </motion.header>
+      {/* Mobile Main Menu Dropdown */}
+      <AnimatePresence>
+        {mobileMenuOpen && !showMobileSidebarToggle && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden bg-dark-950/95 backdrop-blur-2xl border-b border-white/[0.08] overflow-hidden"
+          >
+            <nav className="p-4 space-y-1">
+              {navLinks.map((link) => {
+                const isActive =
+                  link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                      isActive
+                        ? "text-white bg-brand-500/15 border border-brand-500/20"
+                        : "text-slate-300 hover:text-white hover:bg-white/[0.05]"
+                    )}
+                  >
+                    <span>{link.label}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-500" />
+                  </Link>
+                );
+              })}
+              <div className="pt-2 border-t border-white/[0.08]">
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Go to Dashboard</span>
+                </Link>
+              </div>
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </header>
   );
 }

@@ -8,9 +8,12 @@ export class QuestionService {
     type?: string;
     topic?: string;
     company?: string;
+    role?: string;
     search?: string;
+    source?: string;
+    verified?: boolean;
   }) {
-    const { page = 1, limit = 20, difficulty, type, topic, company, search } = params;
+    const { page = 1, limit = 50, difficulty, type, topic, company, role, search, source, verified } = params;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -18,10 +21,22 @@ export class QuestionService {
     if (type) where.type = type;
     if (search) where.text = { contains: search, mode: 'insensitive' };
     if (topic) {
-      where.topics = { some: { topic: { slug: topic } } };
+      where.topics = { some: { topic: { slug: { equals: topic, mode: 'insensitive' } } } };
     }
     if (company) {
-      where.companyQuestions = { some: { company: { slug: company } } };
+      where.companyQuestions = { some: { company: { slug: { equals: company, mode: 'insensitive' } } } };
+    }
+    if (role && role !== 'All') {
+      where.OR = [
+        { text: { contains: role, mode: 'insensitive' } },
+        { reportQuestions: { some: { report: { role: { contains: role, mode: 'insensitive' } } } } },
+      ];
+    }
+    if (source) {
+      where.source = { contains: source, mode: 'insensitive' };
+    }
+    if (verified !== undefined) {
+      where.isVerified = verified;
     }
 
     const [questions, total] = await Promise.all([

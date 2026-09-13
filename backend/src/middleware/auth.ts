@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import { createClerkClient } from '@clerk/backend';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
+const verifyAuthToken = async (token: string) => {
+  return verifyToken(token, {
+    secretKey: process.env.CLERK_SECRET_KEY,
+    jwtKey: process.env.CLERK_JWT_KEY,
+  });
+};
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;
@@ -22,7 +29,7 @@ export const requireAuth = async (
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await clerk.verifyToken(token);
+    const payload = await verifyAuthToken(token);
 
     req.userId = payload.sub;
     next();
@@ -40,7 +47,7 @@ export const optionalAuth = async (
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
-      const payload = await clerk.verifyToken(token);
+      const payload = await verifyAuthToken(token);
       req.userId = payload.sub;
     }
     next();
@@ -62,7 +69,7 @@ export const requireAdmin = async (
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await clerk.verifyToken(token);
+    const payload = await verifyAuthToken(token);
     req.userId = payload.sub;
 
     // Check admin role from Clerk metadata
@@ -80,3 +87,4 @@ export const requireAdmin = async (
     res.status(401).json({ success: false, message: 'Authentication failed' });
   }
 };
+
