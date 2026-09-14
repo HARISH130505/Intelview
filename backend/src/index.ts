@@ -41,7 +41,7 @@ app.use(rateLimiter);
 // ============================================================
 // HEALTH CHECK
 // ============================================================
-app.get('/health', (_, res) => {
+app.get('/health', (_req: any, res: any) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'intelview-api' });
 });
 
@@ -67,7 +67,7 @@ app.use('/api/research', researchRoutes); // 🔍 Live Gemini Search Grounding
 app.use(errorHandler);
 
 // 404 handler
-app.use('*', (_, res) => {
+app.use('*', (_req: any, res: any) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
