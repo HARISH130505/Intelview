@@ -2,14 +2,20 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { asyncHandler } from '../middleware/errorHandler';
-import { requireAuth } from '../middleware/auth';
+import { optionalAuth, requireAuth } from '../middleware/auth';
 import { resumeService } from '../services/ResumeService';
 import { uploadRateLimiter } from '../middleware/rateLimit';
+import fs from 'fs';
 
 const router = Router();
 
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const upload = multer({
-  dest: 'uploads/',
+  dest: uploadDir,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req: any, file: any, cb: any) => {
     const allowed = ['.pdf', '.doc', '.docx'];
@@ -19,7 +25,7 @@ const upload = multer({
   },
 });
 
-router.post('/upload', requireAuth, uploadRateLimiter, upload.single('resume'), asyncHandler(async (req: any, res: any) => {
+router.post('/upload', optionalAuth, uploadRateLimiter, upload.single('resume'), asyncHandler(async (req: any, res: any) => {
   if (!req.file) {
     res.status(400).json({ success: false, message: 'No file uploaded' });
     return;

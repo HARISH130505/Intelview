@@ -3,10 +3,11 @@ import { aiService } from './AIService';
 import cloudinary from '../utils/cloudinary';
 import pdfParse from 'pdf-parse';
 import fs from 'fs';
+import { resolveUserId } from '../utils/userResolver';
 
 export class ResumeService {
   async uploadAndAnalyze(params: {
-    userId: string;
+    userId?: string;
     filePath: string;
     fileName: string;
     fileSize: number;
@@ -14,46 +15,53 @@ export class ResumeService {
     jdTitle?: string;
     jdCompany?: string;
   }) {
-    // Upload file to Cloudinary
+    const internalUserId = await resolveUserId(params.userId);
+
+    // 1. Read PDF text FIRST before unlinking
+    let resumeText = '';
+    try {
+      if (fs.existsSync(params.filePath)) {
+        const buffer = fs.readFileSync(params.filePath);
+        if (buffer.length > 0) {
+          const parsed = await pdfParse(buffer);
+          resumeText = parsed.text || '';
+        }
+      }
+    } catch (err) {
+      console.warn('PDF parsing error, using filename fallback:', err);
+      resumeText = params.fileName;
+    }
+
+    // 2. Upload file to Cloudinary (optional fallback)
     let fileUrl = '';
     try {
       const result = await cloudinary.uploader.upload(params.filePath, {
         folder: 'intelview/resumes',
         resource_type: 'raw',
-        public_id: `resume-${params.userId}-${Date.now()}`,
+        public_id: `resume-${internalUserId}-${Date.now()}`,
       });
       fileUrl = result.secure_url;
     } catch (err) {
       console.warn('Cloudinary upload failed, using local path:', err);
-      fileUrl = params.filePath; // Fallback
+      fileUrl = params.fileName; // Fallback
     }
 
-    // Clean up temp file
-    try { fs.unlinkSync(params.filePath); } catch {}
+    // 3. Clean up temp file
+    try {
+      if (fs.existsSync(params.filePath)) {
+        fs.unlinkSync(params.filePath);
+      }
+    } catch {}
 
-    // Store upload record
+    // 4. Store upload record
     const upload = await prisma.resumeUpload.create({
       data: {
-        userId: params.userId,
+        userId: internalUserId,
         fileUrl,
         fileName: params.fileName,
         fileSize: params.fileSize,
       },
     });
-
-    // Read PDF text (if it's a local path we can still parse it or use fileUrl)
-    let resumeText = '';
-    try {
-      const buffer = fs.existsSync(params.filePath) 
-        ? fs.readFileSync(params.filePath)
-        : Buffer.from('');
-      if (buffer.length > 0) {
-        const parsed = await pdfParse(buffer);
-        resumeText = parsed.text;
-      }
-    } catch (err) {
-      resumeText = params.fileName; // Minimal fallback
-    }
 
     // AI Analysis
     let analysis;
@@ -101,9 +109,10 @@ export class ResumeService {
     return { upload, analysis: storedAnalysis, summary: analysis.summary };
   }
 
-  async getUserResumeHistory(userId: string) {
+  async getUserResumeHistory(userId?: string) {
+    const internalUserId = await resolveUserId(userId);
     return prisma.resumeUpload.findMany({
-      where: { userId },
+      where: { userId: internalUserId },
       include: { analyses: { orderBy: { createdAt: 'desc' }, take: 1 } },
       orderBy: { uploadedAt: 'desc' },
     });

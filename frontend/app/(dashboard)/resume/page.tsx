@@ -122,24 +122,13 @@ export default function ResumePage() {
       const data = await resumeAPI.upload(formData);
       setResult(data);
       toast.success("Resume analyzed successfully!");
-    } catch {
-      // Demo fallback
-      setResult({
-        analysis: {
-          atsScore: 78,
-          matchedSkills: ["React", "TypeScript", "Node.js", "REST APIs", "Git", "SQL"],
-          missingSkills: ["Kubernetes", "AWS ECS", "GraphQL", "Redis"],
-          matchedKeywords: ["agile", "microservices", "scalable", "CI/CD"],
-          suggestions: [
-            { category: "Missing Skills", priority: "high", suggestion: "Add Docker and Kubernetes experience to project descriptions.", impact: "Required in 80% of backend roles." },
-            { category: "Impact Metrics", priority: "medium", suggestion: "Quantify your achievements with metrics (e.g., 'improved latency by 40%').", impact: "Boosts ATS recruiter score." },
-            { category: "Keyword Optimization", priority: "low", suggestion: "Include cloud technologies in the skills section.", impact: "Improves keyword match rate." },
-          ],
-          skillsBreakdown: { technical: 78, experience: 65, education: 90, keywords: 58 },
-        },
-        summary: "Your resume is a strong match for this role. Key gaps are cloud infrastructure and containerization skills.",
-      });
-      toast.success("Analysis complete");
+    } catch (err: any) {
+      console.error("Resume analysis failed:", err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to analyze resume. Please try again.";
+      toast.error(message);
     } finally {
       setAnalyzing(false);
     }
