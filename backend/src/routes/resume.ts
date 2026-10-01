@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/errorHandler';
 import { optionalAuth, requireAuth } from '../middleware/auth';
 import { resumeService } from '../services/ResumeService';
 import { uploadRateLimiter } from '../middleware/rateLimit';
+import { resolveUserId } from '../utils/userResolver';
 import fs from 'fs';
 
 const router = Router();
@@ -18,10 +19,11 @@ const upload = multer({
   dest: uploadDir,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req: any, file: any, cb: any) => {
-    const allowed = ['.pdf', '.doc', '.docx'];
+    // Only PDF is supported — DOC/DOCX require a separate binary parser not installed.
+    // The service double-checks this, but reject early here for a cleaner error.
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) cb(null, true);
-    else cb(new Error('Only PDF and Word documents are allowed'));
+    if (ext === '.pdf') cb(null, true);
+    else cb(Object.assign(new Error('Only PDF files are supported. Please convert your resume to PDF.'), { statusCode: 400 }));
   },
 });
 
@@ -57,6 +59,15 @@ router.get('/analysis/:id', requireAuth, asyncHandler(async (req: any, res: any)
     res.status(404).json({ success: false, message: 'Analysis not found' });
     return;
   }
+
+  // IDOR check: resolve the Clerk userId to internal user ID and compare
+  // against the resume upload's owner to prevent cross-user data access.
+  const internalUserId = await resolveUserId(req.userId);
+  if (analysis.resume?.userId && analysis.resume.userId !== internalUserId) {
+    res.status(403).json({ success: false, message: 'Access denied' });
+    return;
+  }
+
   res.json({ success: true, analysis });
 }));
 

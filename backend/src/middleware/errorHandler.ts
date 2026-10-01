@@ -19,7 +19,10 @@ export const errorHandler = (
   _next: NextFunction
 ): void => {
   const statusCode = err.statusCode || 500;
-  const message = err.isOperational ? err.message : 'Internal server error';
+  // Show the actual error message for client errors (4xx) and operational errors
+  // so multer file validation and service-level errors surface correctly.
+  const isClientError = statusCode >= 400 && statusCode < 500;
+  const message = (err.isOperational || isClientError) ? err.message : 'Internal server error';
 
   if (process.env.NODE_ENV !== 'production') {
     console.error('Error:', {

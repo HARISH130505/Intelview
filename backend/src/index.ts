@@ -29,8 +29,30 @@ const PORT = process.env.PORT || 5000;
 // MIDDLEWARE
 // ============================================================
 app.use(helmet());
+const rawFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+const allowedOrigins = rawFrontendUrl
+  .split(',')
+  .map(url => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+if (process.env.NODE_ENV !== 'production' && !allowedOrigins.includes('http://localhost:3000')) {
+  allowedOrigins.push('http://localhost:3000');
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    if (allowedOrigins.some(allowed => allowed.toLowerCase() === normalizedOrigin.toLowerCase())) {
+      return callback(null, true);
+    }
+    // Also allow Vercel deployment URLs if FRONTEND_URL contains vercel.app
+    if (allowedOrigins.some(ao => ao.includes('vercel.app')) && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalizedOrigin)) {
+      return callback(null, true);
+    }
+    callback(null, false);
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

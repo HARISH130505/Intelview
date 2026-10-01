@@ -143,7 +143,15 @@ export class MockService {
       },
     });
 
-    if (!session) throw new Error('Session not found');
+    if (!session) throw Object.assign(new Error('Session not found'), { statusCode: 404, isOperational: true });
+
+    // IDOR Check: enforce ownership if session belongs to a user
+    if (session.userId) {
+      const internalUserId = await resolveUserId(userId);
+      if (session.userId !== internalUserId) {
+        throw Object.assign(new Error('Access denied: You do not have permission to modify this mock interview session'), { statusCode: 403, isOperational: true });
+      }
+    }
 
     const answeredQuestions = session.questions.filter((q) => q.score !== null);
     const totalScore =
@@ -216,14 +224,26 @@ export class MockService {
     });
   }
 
-  async getSessionReport(sessionId: string, _userId?: string) {
-    return prisma.mockSession.findFirst({
+  async getSessionReport(sessionId: string, userId?: string) {
+    const session = await prisma.mockSession.findFirst({
       where: { id: sessionId },
       include: {
         company: { select: { name: true, slug: true, logo: true, tier: true } },
         questions: true,
       },
     });
+
+    if (!session) return null;
+
+    // IDOR Check: if session belongs to a user, enforce ownership
+    if (session.userId) {
+      const internalUserId = await resolveUserId(userId);
+      if (session.userId !== internalUserId) {
+        throw Object.assign(new Error('Access denied: You do not have permission to view this mock interview report'), { statusCode: 403, isOperational: true });
+      }
+    }
+
+    return session;
   }
 
   async getUserSessions(userId?: string) {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
-import { requireAuth, optionalAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth, requireAdmin } from '../middleware/auth';
 import { reportService } from '../services/ReportService';
 import { aiService } from '../services/AIService';
 
@@ -32,7 +32,7 @@ router.post('/extract', asyncHandler(async (req: any, res: any) => {
 }));
 
 // GET /api/reports/pending - admin pending reports
-router.get('/pending', requireAuth, asyncHandler(async (req: any, res: any) => {
+router.get('/pending', requireAdmin, asyncHandler(async (req: any, res: any) => {
   const { page } = req.query;
   const result = await reportService.getPendingReports(page ? parseInt(page) : 1);
   res.json({ success: true, ...result });
@@ -62,12 +62,12 @@ router.post('/:id/helpful', asyncHandler(async (req: any, res: any) => {
 }));
 
 // Admin routes
-router.put('/:id/approve', requireAuth, asyncHandler(async (req: any, res: any) => {
+router.put('/:id/approve', requireAdmin, asyncHandler(async (req: any, res: any) => {
   const report = await reportService.approveReport(req.params.id);
   res.json({ success: true, report });
 }));
 
-router.put('/:id/reject', requireAuth, asyncHandler(async (req: any, res: any) => {
+router.put('/:id/reject', requireAdmin, asyncHandler(async (req: any, res: any) => {
   const report = await reportService.rejectReport(req.params.id);
   res.json({ success: true, report });
 }));

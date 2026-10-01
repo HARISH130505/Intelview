@@ -1,5 +1,6 @@
 import { prisma } from '../utils/prisma';
 import { aiService } from './AIService';
+import { resolveUserId } from '../utils/userResolver';
 
 export class ReportService {
   async getAllReports(params: {
@@ -161,11 +162,19 @@ export class ReportService {
       }
     }
 
-    // 2. Create the report
+    // 2. Resolve userId: data.userId is a Clerk ID ('user_...'), but the FK on
+    // InterviewReport.userId references User.id (internal CUID). Translate here.
+    // If no userId is provided (anonymous submission), pass undefined to DB.
+    let resolvedUserId: string | undefined;
+    if (data.userId) {
+      resolvedUserId = await resolveUserId(data.userId);
+    }
+
+    // 3. Create the report
     const report = await prisma.interviewReport.create({
       data: {
         companyId: resolvedCompanyId,
-        userId: data.userId,
+        userId: resolvedUserId,
         role: data.role || 'Software Engineer',
         location: data.location,
         interviewDate: data.interviewDate ? new Date(data.interviewDate) : undefined,

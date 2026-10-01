@@ -18,18 +18,47 @@ export class ResumeService {
     const internalUserId = await resolveUserId(params.userId);
 
     // 1. Read PDF text FIRST before unlinking
+    // NOTE: Only PDF parsing is implemented. DOC/DOCX files are not supported
+    // because they are binary formats requiring a separate parsing library.
+    // The multer file filter already rejects non-PDF/DOC/DOCX files, but at
+    // the service level we reject DOC/DOCX explicitly so the AI never receives
+    // a filename string as the resume text.
+    const ext = params.fileName.toLowerCase().split('.').pop() || '';
+    if (ext === 'doc' || ext === 'docx') {
+      // Clean up uploaded temp file before throwing
+      try { if (fs.existsSync(params.filePath)) fs.unlinkSync(params.filePath); } catch {}
+      throw Object.assign(
+        new Error('DOC and DOCX files cannot be parsed on the server. Please convert your resume to PDF and try again.'),
+        { statusCode: 400 }
+      );
+    }
+
     let resumeText = '';
     try {
       if (fs.existsSync(params.filePath)) {
         const buffer = fs.readFileSync(params.filePath);
         if (buffer.length > 0) {
           const parsed = await pdfParse(buffer);
-          resumeText = parsed.text || '';
+          resumeText = (parsed.text || '').trim();
         }
       }
-    } catch (err) {
-      console.warn('PDF parsing error, using filename fallback:', err);
-      resumeText = params.fileName;
+      if (!resumeText) {
+        try { if (fs.existsSync(params.filePath)) fs.unlinkSync(params.filePath); } catch {}
+        throw Object.assign(
+          new Error('The uploaded PDF contains no extractable text. Scanned or image-only PDFs are not supported. Please upload a text-based PDF.'),
+          { statusCode: 400, isOperational: true }
+        );
+      }
+    } catch (err: any) {
+      // PDF parsing failed — clean up and surface the error instead of silently
+      // falling back to the filename (which caused the AI to return a fake score)
+      try { if (fs.existsSync(params.filePath)) fs.unlinkSync(params.filePath); } catch {}
+      console.error('PDF parsing error:', err);
+      if (err.statusCode) throw err;
+      throw Object.assign(
+        new Error('Could not extract text from the uploaded PDF. The file may be image-based, password-protected, or corrupted. Please try a text-based PDF.'),
+        { statusCode: 400, isOperational: true }
+      );
     }
 
     // 2. Upload file to Cloudinary (optional fallback)
@@ -121,7 +150,7 @@ export class ResumeService {
   async getAnalysisById(id: string) {
     return prisma.resumeAnalysis.findUnique({
       where: { id },
-      include: { resume: { select: { fileName: true, fileUrl: true } } },
+      include: { resume: { select: { fileName: true, fileUrl: true, userId: true } } },
     });
   }
 }

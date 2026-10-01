@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import { optionalAuth } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
+import { resolveUserId } from '../utils/userResolver';
 
 const router = Router();
 
@@ -73,9 +74,10 @@ router.get('/', optionalAuth, asyncHandler(async (req: any, res: any) => {
 
   // Save search history
   if (req.userId) {
+    const internalUserId = await resolveUserId(req.userId);
     await prisma.searchHistory.create({
       data: {
-        userId: req.userId,
+        userId: internalUserId,
         query,
         filters: { type: searchType },
         resultCount: Object.values(results).reduce((sum: number, arr: any) => sum + arr.length, 0),

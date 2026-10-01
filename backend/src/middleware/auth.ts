@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { createClerkClient, verifyToken } from '@clerk/backend';
+import { prisma } from '../utils/prisma';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -72,16 +73,35 @@ export const requireAdmin = async (
     const payload = await verifyAuthToken(token);
     req.userId = payload.sub;
 
-    // Check admin role from Clerk metadata
-    const user = await clerk.users.getUser(payload.sub);
-    const role = user.publicMetadata?.role as string;
+    // Check admin role from Clerk metadata first
+    let isRoleAdmin = false;
+    try {
+      const user = await clerk.users.getUser(payload.sub);
+      const role = (user.publicMetadata?.role as string)?.toLowerCase();
+      if (role === 'admin' || role === 'moderator') {
+        isRoleAdmin = true;
+      }
+    } catch {
+      // If Clerk API lookup fails or is unavailable, check database
+    }
 
-    if (role !== 'admin' && role !== 'moderator') {
+    // Also check Prisma user record
+    if (!isRoleAdmin) {
+      const dbUser = await prisma.user.findFirst({
+        where: { clerkId: payload.sub },
+        select: { role: true },
+      });
+      if (dbUser && (dbUser.role === 'ADMIN' || dbUser.role === 'MODERATOR')) {
+        isRoleAdmin = true;
+      }
+    }
+
+    if (!isRoleAdmin) {
       res.status(403).json({ success: false, message: 'Admin access required' });
       return;
     }
 
-    req.userRole = role;
+    req.userRole = 'ADMIN';
     next();
   } catch (error) {
     res.status(401).json({ success: false, message: 'Authentication failed' });

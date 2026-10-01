@@ -182,12 +182,14 @@ class AIService {
     // ✅ Gemini 3.1 Flash-Lite — Bulk extraction and normalization (e.g. interview extraction, resume parsing)
     this.model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
-    // ✅ Gemini 2.5 Flash — User-facing AI features (e.g. roadmaps, mock interviews, chat)
-    this.fastModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // ✅ Gemini 3.8 Flash — User-facing AI features (e.g. roadmaps, mock interviews, chat)
+    // NOTE: gemini-2.5-flash is no longer available; verified working replacement is gemini-3.8-flash
+    this.fastModel = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
-    // ✅ Gemini 2.5 Flash + Google Search Grounding — Live dynamic company research
+    // ✅ Gemini 3.8 Flash + Google Search Grounding — Live dynamic company research
+    // NOTE: gemini-2.5-flash is deprecated/removed from v1beta. Using gemini-3.8-flash.
     this.researchModel = genAI.getGenerativeModel(
-      { model: 'gemini-2.5-flash' },
+      { model: 'gemini-3.8-flash' },
       { apiVersion: 'v1beta' }
     );
   }
@@ -324,25 +326,35 @@ Return ONLY a valid JSON object with this exact structure:
 Be specific with real questions and accurate URLs. Prioritize 2025-2026 data. Return ONLY the JSON.`;
 
     try {
-      // Call Gemini 2.5 Pro with Google Search Grounding enabled
-      const result = await this.researchModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        tools: [{ googleSearch: {} } as any],
-      });
+      // Call Gemini with Google Search Grounding enabled; fall back to standard model if search quota exceeded
+      let result;
+      let usedSearch = false;
+      try {
+        result = await this.researchModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          tools: [{ googleSearch: {} } as any],
+        });
+        usedSearch = true;
+      } catch (searchErr) {
+        console.warn('researchModel with googleSearch failed, falling back to gemini-3.1-flash-lite:', searchErr);
+        result = await this.model.generateContent(prompt);
+      }
 
       const text = result.response.text();
       const parsed = this.parseJSON<CompanyResearch>(text, this.defaultCompanyResearch(company, role));
 
       // Attach grounding sources if available
-      const groundingMetadata = (result.response as any).candidates?.[0]?.groundingMetadata;
-      if (groundingMetadata?.webSearchQueries) {
-        console.log(`🔍 Gemini searched: ${groundingMetadata.webSearchQueries.join(', ')}`);
-      }
-      if (groundingMetadata?.groundingChunks) {
-        const sourceUrls = groundingMetadata.groundingChunks
-          .map((chunk: any) => chunk.web?.uri)
-          .filter(Boolean);
-        if (sourceUrls.length > 0) parsed.sources = sourceUrls;
+      if (usedSearch) {
+        const groundingMetadata = (result.response as any).candidates?.[0]?.groundingMetadata;
+        if (groundingMetadata?.webSearchQueries) {
+          console.log(`🔍 Gemini searched: ${groundingMetadata.webSearchQueries.join(', ')}`);
+        }
+        if (groundingMetadata?.groundingChunks) {
+          const sourceUrls = groundingMetadata.groundingChunks
+            .map((chunk: any) => chunk.web?.uri)
+            .filter(Boolean);
+          if (sourceUrls.length > 0) parsed.sources = sourceUrls;
+        }
       }
 
       parsed.researchedAt = new Date().toISOString();
@@ -476,8 +488,25 @@ Return ONLY a valid JSON object:
     const prompt = this.buildResumeJDPrompt(resumeText, jdText);
 
     try {
-      const result = await this.model.generateContent(prompt);
+      // Use fastModel (gemini-3.8-flash) — fall back to gemini-3.1-flash-lite if overloaded
+      let result;
+      try {
+        result = await this.fastModel.generateContent(prompt);
+      } catch (fastErr) {
+        console.warn('fastModel failed, falling back to gemini-3.1-flash-lite:', fastErr);
+        result = await this.model.generateContent(prompt);
+      }
+
       const parsed = this.parseJSON<ResumeAnalysis>(result.response.text(), this.defaultResumeAnalysis());
+      // Safety clamp: ensure scores are valid integers 0-100
+      const clamp = (v: unknown) => Math.min(100, Math.max(0, typeof v === 'number' ? Math.round(v) : 0));
+      parsed.atsScore = clamp(parsed.atsScore);
+      parsed.skillsBreakdown = {
+        technical: clamp(parsed.skillsBreakdown?.technical),
+        experience: clamp(parsed.skillsBreakdown?.experience),
+        education: clamp(parsed.skillsBreakdown?.education),
+        keywords: clamp(parsed.skillsBreakdown?.keywords),
+      };
       return parsed;
     } catch (error) {
       console.error('Resume-JD comparison error:', error);
@@ -486,7 +515,7 @@ Return ONLY a valid JSON object:
   }
 
   private buildResumeJDPrompt(resumeText: string, jdText: string): string {
-    return `You are an expert ATS (Applicant Tracking System) analyzer and career advisor.
+    return `You are a strict ATS (Applicant Tracking System) evaluator. Score the resume below against the job description based SOLELY on the actual text content. Do NOT use placeholder values.
 
 JOB DESCRIPTION:
 """
@@ -498,31 +527,43 @@ CANDIDATE RESUME:
 ${resumeText}
 """
 
-Analyze the match and return ONLY a valid JSON object:
+SCORING RUBRIC — derive every number from the actual text above:
+
+atsScore (integer 0–100):
+  90–100: Candidate has ALL required skills, relevant experience matching the role seniority, and most JD keywords.
+  70–89:  Strong match — has most required skills/keywords, only minor gaps.
+  50–69:  Moderate match — has some relevant skills but missing key requirements.
+  30–49:  Weak match — limited overlap, significant skill/experience gaps.
+   0–29:  Poor match — resume does not meaningfully match this job description.
+
+skillsBreakdown (each 0–100, proportional to actual overlap):
+  technical:  Fraction of required technical skills/tools explicitly present in the resume.
+  experience: How well the candidate's years of experience and seniority match the JD requirements.
+  education:  Degree, field, and level match against stated educational requirements.
+  keywords:   Fraction of important JD keywords (tools, frameworks, certifications) found in the resume.
+
+Return ONLY a valid JSON object with no markdown, no code fences:
 {
-  "atsScore": 78,
-  "matchedSkills": ["Python", "React", "SQL"],
-  "missingSkills": ["Docker", "Kubernetes", "AWS"],
-  "matchedKeywords": ["agile", "microservices", "CI/CD"],
+  "atsScore": <integer you calculated using the rubric>,
+  "matchedSkills": [<skills explicitly present in both resume and JD>],
+  "missingSkills": [<required JD skills absent from the resume>],
+  "matchedKeywords": [<JD keywords that appear in the resume>],
   "suggestions": [
     {
-      "category": "Skills",
-      "priority": "high",
-      "suggestion": "Add Docker and Kubernetes experience",
-      "impact": "These are required skills in the JD that are missing from your resume"
+      "category": <"Skills" | "Experience" | "Keywords" | "Formatting">,
+      "priority": <"high" | "medium" | "low">,
+      "suggestion": <specific actionable advice>,
+      "impact": <why this improves the ATS score>
     }
   ],
   "skillsBreakdown": {
-    "technical": 75,
-    "experience": 80,
-    "education": 90,
-    "keywords": 65
+    "technical": <integer you calculated>,
+    "experience": <integer you calculated>,
+    "education": <integer you calculated>,
+    "keywords": <integer you calculated>
   },
-  "summary": "Your resume is a strong match for this role with 78% compatibility..."
-}
-
-Score rules: atsScore is 0-100, skillsBreakdown values are 0-100.
-Return ONLY the JSON.`;
+  "summary": <2-3 sentence qualitative assessment mentioning the actual calculated score>
+}`;
   }
 
   // ============================================================

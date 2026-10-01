@@ -101,22 +101,37 @@ export class PlannerService {
   }
 
   async getPlanById(id: string, userId?: string) {
-    const internalUserId = await resolveUserId(userId);
-    return prisma.studyPlan.findFirst({
-      where: {
-        id,
-        OR: [
-          { userId: internalUserId },
-          { user: { clerkId: userId || '' } },
-        ],
-      },
+    const plan = await prisma.studyPlan.findUnique({
+      where: { id },
       include: {
         company: { select: { name: true, slug: true, logo: true, tier: true } },
       },
     });
+
+    if (!plan) return null;
+
+    const internalUserId = await resolveUserId(userId);
+    if (plan.userId !== internalUserId) {
+      throw Object.assign(new Error('Access denied: You do not have permission to view this study plan'), { statusCode: 403, isOperational: true });
+    }
+
+    return plan;
   }
 
   async updateProgress(id: string, userId: string | undefined, progress: number) {
+    const plan = await prisma.studyPlan.findUnique({
+      where: { id },
+    });
+
+    if (!plan) {
+      throw Object.assign(new Error('Study plan not found'), { statusCode: 404, isOperational: true });
+    }
+
+    const internalUserId = await resolveUserId(userId);
+    if (plan.userId !== internalUserId) {
+      throw Object.assign(new Error('Access denied: You do not have permission to modify this study plan'), { statusCode: 403, isOperational: true });
+    }
+
     return prisma.studyPlan.update({
       where: { id },
       data: { progress: Math.min(100, Math.max(0, progress)) },
