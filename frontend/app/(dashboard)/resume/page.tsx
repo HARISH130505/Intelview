@@ -231,7 +231,7 @@ export default function ResumePage() {
             {analyzing ? (
               <>
                 <RefreshCcw className="w-4 h-4 animate-spin" />
-                Analyzing with Gemini 2.5 Pro...
+                Analyzing Resume with AI...
               </>
             ) : (
               <>

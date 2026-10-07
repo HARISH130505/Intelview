@@ -154,7 +154,7 @@ export default function CompanyDashboardPage() {
           expiresAt: data.expiresAt,
         });
         if (forceRefresh) {
-          toast.success(`Intelligence for ${roleToFetch} refreshed via Gemini + Google Search!`);
+          toast.success(`Intelligence for ${roleToFetch} refreshed via Live AI Research!`);
         }
       }
     } catch (err) {
@@ -414,7 +414,7 @@ export default function CompanyDashboardPage() {
                 ) : (
                   <span className="badge text-xs flex items-center gap-1.5 py-1 px-2.5 bg-violet-500/10 text-violet-300 border-violet-500/20">
                     <Sparkles className="w-3.5 h-3.5 text-violet-400" />
-                    Live Gemini 2.5 Flash + Google Grounding
+                    Live AI-Powered Research
                   </span>
                 )}
               </div>
