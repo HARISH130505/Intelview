@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Search, Building2, Filter, ChevronRight } from "lucide-react";
+import { Search, Building2, Filter, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn, getTierColor } from "@/lib/utils";
 import { companiesAPI } from "@/lib/api";
 
@@ -50,28 +50,48 @@ export default function CompanyExplorerPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState<number | null>(null);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedTier]);
 
   useEffect(() => {
     const timer = setTimeout(() => fetchCompanies(), 250);
     return () => clearTimeout(timer);
   }, [search, selectedTier, page]);
 
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   async function fetchCompanies() {
     setLoading(true);
     try {
-      const params: any = { page, limit: 24 };
+      const params: any = { page, limit: 20 };
       if (search) params.search = search;
       if (selectedTier !== "All") params.tier = selectedTier;
 
       const data = await companiesAPI.getAll(params);
-      if (data.companies?.length > 0) {
-        setCompanies(data.companies);
-        setTotalPages(data.totalPages || 1);
+      if (Array.isArray(data.companies)) {
+        if (data.companies.length === 0 && !search && selectedTier === "All") {
+          setCompanies(MOCK_COMPANIES);
+          setTotal(MOCK_COMPANIES.length);
+        } else {
+          setCompanies(data.companies);
+          setTotalPages(data.totalPages || 1);
+          setTotal(typeof data.total === "number" ? data.total : data.companies.length);
+        }
       } else if (companies.length === 0) {
         setCompanies(MOCK_COMPANIES);
+        setTotal(MOCK_COMPANIES.length);
       }
     } catch {
-      if (companies.length === 0) setCompanies(MOCK_COMPANIES);
+      if (companies.length === 0) {
+        setCompanies(MOCK_COMPANIES);
+        setTotal(MOCK_COMPANIES.length);
+      }
     } finally {
       setLoading(false);
     }
@@ -83,13 +103,20 @@ export default function CompanyExplorerPage() {
     return matchSearch && matchTier;
   });
 
+  const isFiltered = Boolean(search.trim() || selectedTier !== "All");
+  const displayCount = total !== null ? total : filtered.length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-medium">
           <Building2 className="w-3.5 h-3.5" />
-          500+ Companies Tracked
+          {loading && total === null
+            ? "Loading companies..."
+            : isFiltered
+            ? `${displayCount} ${displayCount === 1 ? "Company" : "Companies"} Found`
+            : `${displayCount} Companies Tracked`}
         </div>
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white">
           Company Intelligence
@@ -220,6 +247,29 @@ export default function CompanyExplorerPage() {
               </motion.div>
             ))}
           </AnimatePresence>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && !loading && (
+        <div className="flex items-center justify-center gap-3 pt-6 pb-2">
+          <button
+            onClick={() => handlePageChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border border-white/[0.08] text-slate-300 hover:text-white hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <ChevronLeft className="w-4 h-4" /> Previous
+          </button>
+          <span className="text-xs sm:text-sm text-slate-400 font-medium px-2">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
+            disabled={page >= totalPages}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border border-white/[0.08] text-slate-300 hover:text-white hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            Next <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
 

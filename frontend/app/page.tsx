@@ -265,7 +265,7 @@ export default function LandingPage() {
   const statsData = [
     { label: "Companies Tracked", value: liveStats.companies, suffix: "+", icon: Building2, color: "text-brand-400" },
     { label: "Questions Indexed", value: liveStats.questions, suffix: "+", icon: Code2, color: "text-violet-400" },
-    { label: "Interview Reports", value: liveStats.reports, suffix: "", icon: FileSearch, color: "text-emerald-400" },
+    { label: "Interview Reports", value: liveStats.reports, suffix: "+", icon: FileSearch, color: "text-emerald-400" },
     { label: "Community Members", value: Math.max(liveStats.members, 1), suffix: "+", icon: Users, color: "text-amber-400" },
   ];
 
