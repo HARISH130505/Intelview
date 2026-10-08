@@ -199,10 +199,10 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   const [liveStats, setLiveStats] = useState({
-    companies: 0,
-    reports: 0,
-    questions: 0,
-    members: 0,
+    companies: 1,
+    reports: 1,
+    questions: 1,
+    members: 1,
   });
   const [trendingCompanies, setTrendingCompanies] = useState<any[]>([]);
   const [trendingQuestions, setTrendingQuestions] = useState<any[]>([]);
@@ -263,10 +263,10 @@ export default function LandingPage() {
   }, []);
 
   const statsData = [
-    { label: "Companies Tracked", value: liveStats.companies, suffix: "+", icon: Building2, color: "text-brand-400" },
-    { label: "Questions Indexed", value: liveStats.questions, suffix: "+", icon: Code2, color: "text-violet-400" },
-    { label: "Interview Reports", value: liveStats.reports, suffix: "+", icon: FileSearch, color: "text-emerald-400" },
-    { label: "Community Members", value: Math.max(liveStats.members, 1), suffix: "+", icon: Users, color: "text-amber-400" },
+    { label: "Companies Tracked", value: liveStats.companies, icon: Building2, color: "text-brand-400" },
+    { label: "Questions Indexed", value: liveStats.questions, icon: Code2, color: "text-violet-400" },
+    { label: "Interview Reports", value: liveStats.reports, icon: FileSearch, color: "text-emerald-400" },
+    { label: "Community Members", value: Math.max(liveStats.members, 1), icon: Users, color: "text-amber-400" },
   ];
 
   return (
