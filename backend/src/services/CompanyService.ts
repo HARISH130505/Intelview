@@ -64,6 +64,7 @@ export class CompanyService {
           interviewDate: true,
           role: true,
           createdAt: true,
+          source: true,
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
@@ -132,6 +133,10 @@ export class CompanyService {
         lastSeen: cq.lastSeen,
       })),
       analytics,
+      provenanceBreakdown: {
+        publicCount: reports.filter((r: any) => r.source === 'public_web').length,
+        communityCount: reports.filter((r: any) => r.source !== 'public_web').length,
+      },
     };
   }
 

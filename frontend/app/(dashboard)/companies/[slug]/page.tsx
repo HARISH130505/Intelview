@@ -13,20 +13,13 @@ import {
   Target,
   CheckCircle,
   CheckCircle2,
-  Sparkles,
   RefreshCw,
   ExternalLink,
   Clock,
   Layers,
   DollarSign,
   Lightbulb,
-  ShieldCheck,
   ChevronRight,
-  BookOpen,
-  Calendar,
-  AlertCircle,
-  HelpCircle,
-  Briefcase,
 } from "lucide-react";
 import {
   XAxis,
@@ -409,11 +402,10 @@ export default function CompanyDashboardPage() {
                 {researchMeta?.fromCache ? (
                   <span className="badge badge-brand text-xs flex items-center gap-1.5 py-1 px-2.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    ✓ Updated {getDaysAgo(researchMeta.researchedAt)} • 30-Day DB Cache
+                      Updated {getDaysAgo(researchMeta.researchedAt)}
                   </span>
                 ) : (
                   <span className="badge text-xs flex items-center gap-1.5 py-1 px-2.5 bg-violet-500/10 text-violet-300 border-violet-500/20">
-                    <Sparkles className="w-3.5 h-3.5 text-violet-400" />
                     Live AI-Powered Research
                   </span>
                 )}

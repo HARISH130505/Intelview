@@ -10,12 +10,11 @@ import {
   XCircle,
   Clock,
   Plus,
-  Filter,
-  Sparkles,
-  Building2,
   ChevronRight,
-  Layers,
   HelpCircle,
+  ExternalLink,
+  Globe,
+  Users,
 } from "lucide-react";
 import { reportsAPI, companiesAPI } from "@/lib/api";
 import { cn, getDifficultyColor, formatDate } from "@/lib/utils";
@@ -120,14 +119,28 @@ export default function ReportsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-2">
-              <FileText className="w-3.5 h-3.5" /> Community Intelligence
+              <FileText className="w-3.5 h-3.5" /> Interview Intelligence
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white">
               Interview Reports
             </h1>
             <p className="text-slate-400 text-xs sm:text-sm">
-              Real candidate interview loops, questions asked, and hiring outcomes.
+              Real interview loops, questions asked, and hiring outcomes.
             </p>
+            {/* Provenance summary */}
+            {reports.length > 0 && (
+              <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1">
+                  <Globe className="w-3 h-3 text-sky-500" />
+                  <span className="text-sky-400 font-medium">{reports.filter(r => r.source === 'public_web').length} public sources</span>
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3 text-emerald-500" />
+                  <span className="text-emerald-400 font-medium">{reports.filter(r => r.source !== 'public_web').length} community</span>
+                </span>
+              </div>
+            )}
           </div>
 
           <Link
@@ -292,6 +305,26 @@ export default function ReportsPage() {
                     <p className="text-slate-400 text-xs sm:text-sm line-clamp-2 leading-relaxed mb-3 font-sans">
                       &ldquo;{report.experience || report.rawText}&rdquo;
                     </p>
+
+                    {/* Provenance badge for public sources */}
+                    {report.source === 'public_web' && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] font-medium">
+                          <Globe className="w-2.5 h-2.5" /> Public Source
+                        </span>
+                        {report.sourceUrl && (
+                          <a
+                            href={report.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 hover:text-sky-400 transition-colors"
+                          >
+                            View source <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between text-slate-500 text-[11px] pt-2 border-t border-white/[0.04]">
                       <div className="flex items-center gap-3">

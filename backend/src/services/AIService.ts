@@ -366,27 +366,145 @@ Be specific with real questions and accurate URLs. Prioritize 2025-2026 data. Re
   }
 
   private defaultCompanyResearch(company: string, role: string): CompanyResearch {
+    // Curated company intelligence table — used when the live AI research call fails
+    type CompanyProfile = {
+      difficulty: string;
+      offerRate: string;
+      timeline: string;
+      oaPlatform: string;
+      oaDuration: string;
+      frequentTopics: string[];
+      insiderTips: string[];
+    };
+
+    const profiles: Record<string, CompanyProfile> = {
+      google: {
+        difficulty: 'VERY_HARD',
+        offerRate: '~1–3% from application to offer (top DSA + system design bar)',
+        timeline: 'OA → 2 phone screens → 4–5 onsite rounds → committee review → 4–8 weeks total',
+        oaPlatform: 'Google Forms / CodePair',
+        oaDuration: '60–90 minutes',
+        frequentTopics: ['Graphs', 'Trees', 'Dynamic Programming', 'System Design', 'Trie', 'Segment Tree'],
+        insiderTips: ['Think aloud — Googlers value problem-solving process over final answer', 'Optimize for both time and space complexity', 'Practice LeetCode Hard-level problems'],
+      },
+      amazon: {
+        difficulty: 'HARD',
+        offerRate: '~5–10% from OA to offer',
+        timeline: 'OA (HackerRank) → 1 phone screen → Bar Raiser loop (4–5 rounds) → 3–5 weeks total',
+        oaPlatform: 'HackerRank',
+        oaDuration: '90 minutes (2 DSA + work-style survey)',
+        frequentTopics: ['Arrays', 'Trees', 'Graphs', 'Dynamic Programming', 'Leadership Principles', 'System Design'],
+        insiderTips: ['Prepare 2+ STAR stories for ALL 14 Leadership Principles', 'Bar Raiser round is the most critical — focus on ownership and dive-deep', 'OA difficulty: Medium to Hard'],
+      },
+      microsoft: {
+        difficulty: 'HARD',
+        offerRate: '~8–15% from interview to offer',
+        timeline: 'Online assessment → 4–5 interview rounds (phone/onsite) → 3–5 weeks total',
+        oaPlatform: 'HackerRank / Codility',
+        oaDuration: '75 minutes',
+        frequentTopics: ['Trees', 'Graphs', 'Dynamic Programming', 'OOP Design', 'String Manipulation', 'System Design'],
+        insiderTips: ['Microsoft values collaboration — think aloud and engage the interviewer', 'Object-Oriented Design questions are common', 'Focus on code readability and edge cases'],
+      },
+      meta: {
+        difficulty: 'HARD',
+        offerRate: '~3–7% from application to offer',
+        timeline: 'Recruiter screen → 2 technical phone screens → Virtual onsite (4 rounds) → 4–6 weeks total',
+        oaPlatform: 'HackerRank / CoderPad',
+        oaDuration: '70 minutes',
+        frequentTopics: ['Graphs', 'Arrays', 'Trees', 'System Design', 'Dynamic Programming', 'Behavioral/Product Sense'],
+        insiderTips: ['Speed matters at Meta — aim to finish coding problems with time to optimize', 'Practice graph problems extensively (social network context)', 'Behavioral round uses "Tell me about a time..." format'],
+      },
+      facebook: {
+        difficulty: 'HARD',
+        offerRate: '~3–7% from application to offer',
+        timeline: 'Recruiter screen → 2 technical phone screens → Virtual onsite (4 rounds) → 4–6 weeks total',
+        oaPlatform: 'HackerRank / CoderPad',
+        oaDuration: '70 minutes',
+        frequentTopics: ['Graphs', 'Arrays', 'Trees', 'System Design', 'Dynamic Programming'],
+        insiderTips: ['Speed matters — finish fast and then optimize', 'Social-graph-style graph problems are very common'],
+      },
+      apple: {
+        difficulty: 'HARD',
+        offerRate: '~5–10% from screening to offer',
+        timeline: 'Recruiter call → Technical phone screen → Team matching → Onsite (5–6 rounds) → 4–8 weeks total',
+        oaPlatform: 'HackerRank / Take-home project',
+        oaDuration: 'Varies by team',
+        frequentTopics: ['Data Structures', 'Algorithms', 'System Design', 'Low-Level Design', 'Swift/Objective-C (mobile)'],
+        insiderTips: ['Polish and attention to detail matter highly at Apple', 'Team-specific hiring — match your skills to the team', 'Low-Level Design questions are common for SDE roles'],
+      },
+      flipkart: {
+        difficulty: 'HARD',
+        offerRate: '~10–18% from OA to offer',
+        timeline: 'OA (HackerEarth) → Machine coding round → 3–4 technical rounds → HR → 3–5 weeks total',
+        oaPlatform: 'HackerEarth',
+        oaDuration: '90 minutes',
+        frequentTopics: ['Arrays', 'Trees', 'Graphs', 'Dynamic Programming', 'System Design (e-commerce)', 'Low-Level Design'],
+        insiderTips: ['Machine coding round is a major filter — practice designing clean OOP systems', 'System design focuses on e-commerce (search, cart, payments, catalog)', 'Flipkart values product thinking alongside coding'],
+      },
+      uber: {
+        difficulty: 'HARD',
+        offerRate: '~8–15% from application to offer',
+        timeline: 'Recruiter call → Technical phone screen → Onsite (3–4 rounds) → 3–5 weeks total',
+        oaPlatform: 'HackerRank / CoderPad',
+        oaDuration: '60–75 minutes',
+        frequentTopics: ['Graphs', 'Geospatial Algorithms', 'System Design (real-time matching)', 'Dynamic Programming', 'Arrays'],
+        insiderTips: ['Graph routing and shortest-path problems are very common', 'System design: focus on real-time, geo-distributed systems (surge pricing, driver matching)', 'Think about scalability at city/country scale'],
+      },
+      netflix: {
+        difficulty: 'VERY_HARD',
+        offerRate: '~2–5% from application to offer (extremely selective)',
+        timeline: 'Recruiter screen → 2–3 technical rounds → System design round → Culture fit → 5–8 weeks total',
+        oaPlatform: 'CoderPad / Take-home',
+        oaDuration: 'Varies (often a take-home project)',
+        frequentTopics: ['Distributed Systems', 'System Design (streaming, CDN)', 'Java/Python', 'Algorithms', 'Database Design'],
+        insiderTips: ['Netflix has a very high bar — senior engineers only (no juniors in most teams)', 'Culture fit is critical: freedom & responsibility principle', 'System design focuses on streaming pipelines and CDN architecture'],
+      },
+      atlassian: {
+        difficulty: 'MEDIUM',
+        offerRate: '~12–20% from technical screen to offer',
+        timeline: 'Recruiter screen → Values interview → Technical phone screen → Onsite (3 rounds) → 3–4 weeks total',
+        oaPlatform: 'HackerRank',
+        oaDuration: '60 minutes',
+        frequentTopics: ['Graphs', 'Trees', 'System Design (Jira/Confluence scale)', 'Behavioral/Values', 'Data Structures'],
+        insiderTips: ['Atlassian values behavioral/cultural fit heavily — practice their 5 values', 'Collaborative pair-programming style: talk through your thought process', 'System design: focus on collaborative, multi-tenant SaaS products'],
+      },
+      adobe: {
+        difficulty: 'MEDIUM',
+        offerRate: '~12–20% from technical screen to offer',
+        timeline: 'Recruiter call → Technical phone screen → Onsite (3–4 rounds) → 3–5 weeks total',
+        oaPlatform: 'HackerRank / Codility',
+        oaDuration: '75 minutes',
+        frequentTopics: ['OOP & Design Patterns', 'Trees', 'Graphs', 'Dynamic Programming', 'System Design', 'Image Processing concepts'],
+        insiderTips: ['OOP design patterns (Factory, Observer, Strategy) are very common', 'System design often involves document/image processing pipelines', 'Focus on clean, modular code — Adobe values software craftsmanship'],
+      },
+    };
+
+    // Match company name to a profile (case-insensitive, partial match)
+    const key = Object.keys(profiles).find(k => company.toLowerCase().includes(k));
+    const profile = key ? profiles[key] : null;
+
     return {
       company,
       role,
       oaFormat: {
-        platform: 'HackerRank',
-        duration: 'Varies',
-        questionTypes: ['DSA problems'],
-        tips: ['Practice consistently'],
+        platform: profile?.oaPlatform ?? 'HackerRank / Company Portal',
+        duration: profile?.oaDuration ?? 'Varies by role',
+        questionTypes: ['DSA problems', 'Problem solving'],
+        tips: ['Read the problem statement carefully', 'Handle edge cases', 'Aim for optimal complexity'],
       },
       interviewRounds: [],
-      frequentTopics: ['Arrays', 'Dynamic Programming', 'System Design'],
+      frequentTopics: profile?.frequentTopics ?? ['Arrays', 'Dynamic Programming', 'Trees', 'System Design'],
       recentQuestions: [],
       preparationResources: [
         { title: 'LeetCode', url: 'https://leetcode.com', type: 'practice', description: 'Primary DSA practice platform' },
         { title: 'NeetCode', url: 'https://neetcode.io', type: 'video', description: 'Structured problem-solving roadmap' },
+        { title: 'Glassdoor', url: `https://www.glassdoor.com/Interview/${company.replace(/\s+/g, '-')}-Interview-Questions-E.htm`, type: 'article', description: `${company} interview experiences from past candidates` },
       ],
-      salaryInsights: 'Check Glassdoor for latest compensation data.',
-      difficulty: 'MEDIUM',
-      offerRate: 'Data being gathered...',
-      timeline: 'Typically 4-6 weeks from application to offer.',
-      insiderTips: ['Prepare thoroughly', 'Practice mock interviews'],
+      salaryInsights: `Check Glassdoor and Levels.fyi for the latest ${company} ${role} compensation data.`,
+      difficulty: profile?.difficulty ?? 'MEDIUM',
+      offerRate: profile?.offerRate ?? 'Typically 10–20% from technical screen to offer (varies by role and team)',
+      timeline: profile?.timeline ?? 'Recruiter screen → Technical rounds → HR → 3–6 weeks total',
+      insiderTips: profile?.insiderTips ?? ['Prepare thoroughly across DSA and system design', 'Practice mock interviews', 'Review company-specific interview experiences on Glassdoor'],
       sources: [],
       researchedAt: new Date().toISOString(),
     };
