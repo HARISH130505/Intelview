@@ -582,8 +582,21 @@ Return ONLY a valid JSON object with no markdown, no code fences:
     const prompt = this.buildRoadmapPrompt(params);
 
     try {
-      const result = await this.model.generateContent(prompt);
-      return this.parseJSON<StudyRoadmap>(result.response.text(), this.defaultRoadmap(params.availableDays));
+      // Use fastModel for better reasoning quality on roadmap generation
+      let result;
+      try {
+        result = await this.fastModel.generateContent(prompt);
+      } catch (fastErr) {
+        console.warn('fastModel failed for roadmap, falling back to gemini-3.1-flash-lite:', fastErr);
+        result = await this.model.generateContent(prompt);
+      }
+      const parsed = this.parseJSON<StudyRoadmap>(result.response.text(), this.defaultRoadmap(params.availableDays));
+      // Ensure the plan has actual days content
+      if (!parsed.days || parsed.days.length === 0) {
+        console.warn('Roadmap returned empty days, using fallback');
+        return this.defaultRoadmap(params.availableDays);
+      }
+      return parsed;
     } catch (error) {
       console.error('Roadmap generation error:', error);
       return this.defaultRoadmap(params.availableDays);
@@ -599,46 +612,91 @@ Return ONLY a valid JSON object with no markdown, no code fences:
     weakTopics?: string[];
     topTopics?: string[];
   }): string {
-    return `You are an expert interview coach creating a personalized study roadmap.
+    // Build a company-specific known interview pattern context
+    const companyLower = params.company.toLowerCase();
+    let companyContext = '';
+    if (companyLower.includes('google')) {
+      companyContext = 'Google interviews emphasize: Graphs/Trees/DP (very heavily), System Design (scalability, distributed systems), clean code with optimal complexity. Leetcode Hard is common. Behavioral uses STAR format. Known patterns: BFS/DFS trees, trie, segment tree, LRU cache, rate limiter design.';
+    } else if (companyLower.includes('amazon')) {
+      companyContext = 'Amazon interviews emphasize: Leadership Principles (14 LPs, very heavily in behavioral), Arrays/Graphs/DP coding, System Design (microservices, SQS, DynamoDB). Two-stage: OA on HackerRank then 4-5 rounds. Common: LRU cache, meeting rooms, word ladder, design Amazon ordering system.';
+    } else if (companyLower.includes('microsoft')) {
+      companyContext = 'Microsoft interviews emphasize: Trees/Graphs/DP/String manipulation, Object-Oriented Design, collaborative problem solving. 4-5 rounds, strong emphasis on communication. Common: serialize/deserialize BST, clone graph, design parking lot.';
+    } else if (companyLower.includes('meta') || companyLower.includes('facebook')) {
+      companyContext = 'Meta/Facebook interviews emphasize: Graphs, Trees, Arrays/Strings, Product Sense (for senior), System Design (social graph, news feed, ads). Fast-paced coding. Common: Number of Islands, Course Schedule, Design Facebook Messenger.';
+    } else if (companyLower.includes('apple')) {
+      companyContext = 'Apple interviews emphasize: Data Structures, Algorithms, Swift/Objective-C knowledge (for mobile), System Design. Polished communication expected. Common: implement LRU, design Siri, string parsing.';
+    } else if (companyLower.includes('flipkart')) {
+      companyContext = 'Flipkart interviews emphasize: DSA (Arrays, Trees, DP, Graphs), System Design (e-commerce scale: catalog, cart, payments, search), Low-Level Design (OOP). OA on HackerEarth. Common: design a shopping cart, recommendation engine, inventory system.';
+    } else if (companyLower.includes('uber')) {
+      companyContext = 'Uber interviews emphasize: Graphs (routing algorithms), Real-time systems, Geospatial problems, System Design (surge pricing, matching). Common: nearest driver matching, graph shortest path variants, design Uber backend.';
+    } else if (companyLower.includes('netflix')) {
+      companyContext = 'Netflix interviews emphasize: Distributed Systems, Streaming architecture, Java/Python, System Design (CDN, recommendation, A/B testing), Coding (medium-hard DSA). Common: design Netflix streaming, implement rate limiter, consistent hashing.';
+    } else if (companyLower.includes('atlassian')) {
+      companyContext = 'Atlassian interviews emphasize: Collaborative coding (pair programming style), Data Structures, System Design (Jira/Confluence scale), Values-fit behavioral. Common: graph traversal, design issue tracker, LRU cache.';
+    } else if (companyLower.includes('adobe')) {
+      companyContext = 'Adobe interviews emphasize: OOP/Design Patterns, DSA (Trees, Graphs, DP), Image/Document processing concepts, System Design. Common: design Photoshop undo, PDF rendering pipeline, implement iterator pattern.';
+    } else {
+      companyContext = `Research known interview patterns for ${params.company}: focus on their core product domain (e.g. fintech → rate limiter/fraud detection, edtech → recommendation/search, gaming → real-time/graph), commonly seen DSA topics from interview forums, and their tech stack.`;
+    }
 
-TARGET: ${params.company} - ${params.role}
+    const topicsSection = params.topTopics?.length
+      ? `HIGH-FREQUENCY TOPICS FROM ${params.company.toUpperCase()}'s ACTUAL INTERVIEW DATA: ${params.topTopics.join(', ')}\nPrioritize these topics heavily throughout the plan.`
+      : `Use your knowledge of ${params.company}'s interview patterns to select the most relevant topics.`;
+
+    return `You are an expert interview coach. Generate a COMPANY-SPECIFIC, ROLE-SPECIFIC study roadmap. This plan must be meaningfully different from a generic DSA plan — it must reflect the ACTUAL interview style and common questions of ${params.company}.
+
+COMPANY: ${params.company}
+ROLE: ${params.role}
 EXPERIENCE LEVEL: ${params.experienceLevel}
-AVAILABLE DAYS: ${params.availableDays}
-DAILY HOURS: ${params.dailyHours}
-${params.weakTopics?.length ? `WEAK AREAS: ${params.weakTopics.join(', ')}` : ''}
-${params.topTopics?.length ? `FREQUENTLY ASKED: ${params.topTopics.join(', ')}` : ''}
+PREPARATION DAYS: ${params.availableDays}
+DAILY HOURS AVAILABLE: ${params.dailyHours}
 
-Create a detailed study roadmap. Return ONLY valid JSON:
+COMPANY INTERVIEW INTELLIGENCE:
+${companyContext}
+
+${topicsSection}
+${params.weakTopics?.length ? `\nCANDIDATE WEAK AREAS TO ADDRESS: ${params.weakTopics.join(', ')}` : ''}
+
+INSTRUCTIONS:
+1. The overview must mention ${params.company} specifically and what makes their interviews unique.
+2. Day titles and tasks must reference ${params.company}-specific patterns (e.g. "Amazon Leadership Principles Deep Dive", "Google Graph Traversal Mastery").
+3. Distribute topic coverage so the most important topics for ${params.company} get more days.
+4. Include at least one System Design day if the role is SDE-2 or senior, or if ${params.company} is known for it.
+5. Include behavioral prep days tailored to ${params.company}'s values/culture.
+6. Each day must have 3-4 tasks: study theory, practice problems, review/reflect, and optionally a mock challenge.
+7. Milestones must reflect ${params.company}-specific readiness checkpoints.
+
+Return ONLY valid JSON (no markdown, no code fences):
 {
   "totalDays": ${params.availableDays},
-  "overview": "Brief overview of the preparation strategy",
+  "overview": "${params.company}-specific overview of the preparation strategy for ${params.role}",
   "milestones": [
-    {"day": 7, "title": "Foundation Complete", "description": "Master basic data structures"},
-    {"day": 14, "title": "Algorithm Proficiency", "description": "..."}
+    {"day": ${Math.ceil(params.availableDays * 0.25)}, "title": "Foundation Locked", "description": "Core DSA patterns relevant to ${params.company}"},
+    {"day": ${Math.ceil(params.availableDays * 0.6)}, "title": "${params.company} Pattern Mastery", "description": "High-frequency ${params.company} topics covered"},
+    {"day": ${params.availableDays}, "title": "Interview Ready for ${params.company}", "description": "Mock interviews, behavioral prep, final review"}
   ],
   "days": [
     {
       "day": 1,
-      "title": "Arrays & Strings Foundation",
-      "topics": ["Arrays", "Two Pointers", "Sliding Window"],
+      "title": "[Company-specific day title]",
+      "topics": ["Topic1", "Topic2"],
       "tasks": [
-        {"type": "study", "description": "Study array operations and time complexity", "duration": 45},
-        {"type": "practice", "description": "Solve 3 easy array problems on LeetCode", "duration": 60, "difficulty": "easy"},
-        {"type": "review", "description": "Review solutions and patterns", "duration": 15}
+        {"type": "study", "description": "[Specific to ${params.company}]", "duration": 45},
+        {"type": "practice", "description": "[Specific LeetCode problems or patterns]", "duration": 60, "difficulty": "easy"},
+        {"type": "review", "description": "Review and note patterns", "duration": 15}
       ],
       "estimatedHours": ${params.dailyHours},
-      "resources": ["LeetCode Arrays", "NeetCode Arrays playlist"]
+      "resources": ["LeetCode", "NeetCode"]
     }
   ],
   "resources": [
     {"title": "LeetCode", "type": "practice", "url": "https://leetcode.com"},
     {"title": "NeetCode", "type": "video", "url": "https://neetcode.io"}
   ],
-  "tips": ["Focus on patterns, not memorization", "Practice timed coding"]
+  "tips": ["${params.company}-specific tip 1", "${params.company}-specific tip 2"]
 }
 
-Create plans for all ${params.availableDays} days. Day plans should be progressive (easy → hard).
-Return ONLY the JSON.`;
+Generate all ${params.availableDays} days. Return ONLY the JSON.`;
   }
 
   // ============================================================
