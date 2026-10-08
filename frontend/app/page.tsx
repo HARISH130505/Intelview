@@ -25,12 +25,12 @@ import { Footer } from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
 import { analyticsAPI } from "@/lib/api";
 
-const STATS = [
-  { label: "Companies Tracked", value: 500, suffix: "+", icon: Building2, color: "text-brand-400" },
-  { label: "Interview Reports", value: 12000, suffix: "+", icon: FileSearch, color: "text-emerald-400" },
-  { label: "Questions Indexed", value: 50000, suffix: "+", icon: Code2, color: "text-violet-400" },
-  { label: "Students Helped", value: 80000, suffix: "+", icon: Users, color: "text-amber-400" },
-];
+interface StatItem {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+}
 
 const FEATURES = [
   {
@@ -83,24 +83,6 @@ const FEATURES = [
   },
 ];
 
-const TRENDING_COMPANIES = [
-  { name: "Google", slug: "google", tier: "FAANG", reports: 843, logo: "G", color: "from-blue-500 to-green-500" },
-  { name: "Amazon", slug: "amazon", tier: "FAANG", reports: 921, logo: "A", color: "from-orange-500 to-yellow-500" },
-  { name: "Microsoft", slug: "microsoft", tier: "FAANG", reports: 712, logo: "M", color: "from-blue-600 to-cyan-500" },
-  { name: "Meta", slug: "meta", tier: "FAANG", reports: 634, logo: "M", color: "from-blue-500 to-indigo-600" },
-  { name: "Netflix", slug: "netflix", tier: "FAANG", reports: 412, logo: "N", color: "from-red-600 to-red-500" },
-  { name: "Apple", slug: "apple", tier: "FAANG", reports: 567, logo: "A", color: "from-gray-600 to-gray-500" },
-  { name: "Flipkart", slug: "flipkart", tier: "TIER1", reports: 389, logo: "F", color: "from-yellow-500 to-amber-500" },
-  { name: "Zoho", slug: "zoho", tier: "TIER1", reports: 256, logo: "Z", color: "from-teal-500 to-cyan-600" },
-];
-
-const TRENDING_QUESTIONS = [
-  { text: "Design a URL Shortener like bit.ly", type: "SYSTEM_DESIGN", difficulty: "HARD", companies: 47 },
-  { text: "Merge K sorted linked lists", type: "CODING", difficulty: "HARD", companies: 89 },
-  { text: "LRU Cache Implementation", type: "CODING", difficulty: "MEDIUM", companies: 72 },
-  { text: "Design a Rate Limiter", type: "SYSTEM_DESIGN", difficulty: "HARD", companies: 54 },
-  { text: "Find all subsets of a set", type: "CODING", difficulty: "MEDIUM", companies: 63 },
-];
 
 const TESTIMONIALS = [
   {
@@ -178,13 +160,13 @@ function useCountUp(end: number, duration = 2000, start = 0) {
   return { count, ref };
 }
 
-function StatCard({ label, value, suffix, icon: Icon, color }: typeof STATS[0]) {
+function StatCard({ label, value, icon: Icon, color }: StatItem) {
   const { count, ref } = useCountUp(value, 800);
   return (
     <div ref={ref} className="glass-card p-6 text-center">
       <Icon className={cn("w-8 h-8 mx-auto mb-3", color)} />
       <div className="text-3xl font-bold font-display text-white">
-        {count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}K` : count}{suffix}
+        {count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}K` : count}
       </div>
       <div className="text-sm text-slate-400 mt-1">{label}</div>
     </div>
@@ -237,7 +219,7 @@ export default function LandingPage() {
             }))
           );
         } else {
-          setTrendingCompanies(TRENDING_COMPANIES);
+          setTrendingCompanies([]);
         }
 
         if (trending?.data?.topQuestions?.length > 0) {
@@ -250,11 +232,11 @@ export default function LandingPage() {
             }))
           );
         } else {
-          setTrendingQuestions(TRENDING_QUESTIONS);
+          setTrendingQuestions([]);
         }
       } catch {
-        setTrendingCompanies(TRENDING_COMPANIES);
-        setTrendingQuestions(TRENDING_QUESTIONS);
+        setTrendingCompanies([]);
+        setTrendingQuestions([]);
       } finally {
         setLoadingTrending(false);
       }
@@ -262,7 +244,7 @@ export default function LandingPage() {
     loadLandingData();
   }, []);
 
-  const statsData = [
+  const statsData: StatItem[] = [
     { label: "Companies Tracked", value: liveStats.companies, icon: Building2, color: "text-brand-400" },
     { label: "Questions Indexed", value: liveStats.questions, icon: Code2, color: "text-violet-400" },
     { label: "Interview Reports", value: liveStats.reports, icon: FileSearch, color: "text-emerald-400" },
@@ -445,6 +427,10 @@ export default function LandingPage() {
                   <div className="h-5 bg-white/[0.04] rounded-full w-12" />
                 </div>
               ))
+            ) : trendingCompanies.length === 0 ? (
+              <div className="col-span-full text-center py-8 text-slate-500 text-sm glass-card">
+                No trending companies yet.
+              </div>
             ) : (
               trendingCompanies.map((company, i) => (
                 <motion.div
@@ -509,6 +495,10 @@ export default function LandingPage() {
                   <div className="h-6 bg-white/[0.04] rounded-md w-14 flex-shrink-0" />
                 </div>
               ))
+            ) : trendingQuestions.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm glass-card">
+                No trending questions yet.
+              </div>
             ) : (
               trendingQuestions.map((q, i) => (
                 <motion.div
