@@ -199,10 +199,10 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   const [liveStats, setLiveStats] = useState({
-    companies: 27,
+    companies: 0,
     reports: 0,
-    questions: 59,
-    members: 1,
+    questions: 0,
+    members: 0,
   });
   const [trendingCompanies, setTrendingCompanies] = useState<any[]>([]);
   const [trendingQuestions, setTrendingQuestions] = useState<any[]>([]);

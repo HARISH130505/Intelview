@@ -118,9 +118,6 @@ export default function ReportsPage() {
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-2">
-              <FileText className="w-3.5 h-3.5" /> Interview Intelligence
-            </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white">
               Interview Reports
             </h1>
